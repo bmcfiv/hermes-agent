@@ -10,6 +10,7 @@ import { deNotices } from './de_notices'
 import { deOnboarding } from './de_onboarding'
 import { deProjects } from './de_projects'
 import { deSharedMetrics } from './de_shared_metrics'
+import { deSidebarFilter } from './de_sidebar_filter'
 import { deUpdateChannel } from './de_update_channel'
 import { defineLocale, type TranslationOverrides } from './define-locale'
 import { introDe } from './intro-de'
@@ -3656,37 +3657,7 @@ export const deOverrides = {
     missingBody: 'Dieses Artifact ist nicht mehr in der lokalen Registry.'
   },
   sidebar: {
-    filter: {
-      grouping: 'Gruppierung',
-      ordering: 'Sortierung',
-      show: 'Anzeigen',
-      filters: 'Filter',
-      status: 'Status',
-      pullRequest: 'Pull Request',
-      profile: 'Profil',
-      project: 'Projekt',
-      archived: 'Archiviert',
-      resetToDefaults: 'Auf Standard zurücksetzen',
-      expandAll: 'Alle ausklappen',
-      collapseAll: 'Alle einklappen',
-      inboxStyle: 'Posteingangsstil',
-      updated: 'Aktualisiert',
-      created: 'Erstellt',
-      tokens: 'Tokens',
-      cost: 'Kosten',
-      manual: 'Manuell',
-      preview: 'Vorschau',
-      pr: 'PR',
-      needsInput: 'Eingabe nötig',
-      working: 'In Arbeit',
-      unread: 'Ungelesen',
-      draft: 'Entwurf',
-      idle: 'Inaktiv',
-      open: 'Offen',
-      merged: 'Gemergt',
-      closed: 'Geschlossen',
-      noPR: 'Kein PR'
-    },
+    filter: deSidebarFilter,
     gatewayGroups: {
       grouping: 'Gateway & Profil',
       rename: 'Gruppe umbenennen',

@@ -4242,6 +4242,7 @@
     "sidebar.filter.tokens",
     "sidebar.filter.unread",
     "sidebar.filter.updated",
+    "sidebar.filter.wholeFigures",
     "sidebar.filter.working",
     "sidebar.gatewayGroups.actions",
     "sidebar.gatewayGroups.aliasHint",

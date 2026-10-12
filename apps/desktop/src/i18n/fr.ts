@@ -11,6 +11,7 @@ import { frNotices } from './fr_notices'
 import { frOnboarding } from './fr_onboarding'
 import { frProjects } from './fr_projects'
 import { frSharedMetrics } from './fr_shared_metrics'
+import { frSidebarFilter } from './fr_sidebar_filter'
 import { frUpdateChannel } from './fr_update_channel'
 import { introFr } from './intro-fr'
 
@@ -3665,37 +3666,7 @@ export const frOverrides = {
     missingBody: 'Cet artefact ne figure plus dans le registre local.'
   },
   sidebar: {
-    filter: {
-      grouping: 'Regroupement',
-      ordering: 'Tri',
-      show: 'Afficher',
-      filters: 'Filtres',
-      status: 'État',
-      pullRequest: 'Pull request',
-      profile: 'Profil',
-      project: 'Projet',
-      archived: 'Archivées',
-      resetToDefaults: 'Rétablir les valeurs par défaut',
-      expandAll: 'Tout déplier',
-      collapseAll: 'Tout replier',
-      inboxStyle: 'Style boîte de réception',
-      updated: 'Mise à jour',
-      created: 'Création',
-      tokens: 'Jetons',
-      cost: 'Coût',
-      manual: 'Manuel',
-      preview: 'Aperçu',
-      pr: 'PR',
-      needsInput: 'Action requise',
-      working: 'En cours',
-      unread: 'Non lues',
-      draft: 'Brouillon',
-      idle: 'Inactive',
-      open: 'Ouverte',
-      merged: 'Fusionnée',
-      closed: 'Fermée',
-      noPR: 'Aucune PR'
-    },
+    filter: frSidebarFilter,
     gatewayGroups: {
       grouping: 'Gateway et profil',
       rename: 'Renommer le groupe',

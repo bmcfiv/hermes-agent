@@ -58,6 +58,7 @@ const SIDEBAR_ALL_PROFILES_AGENTS_GROUPED_STORAGE_KEY = 'hermes.desktop.sidebarA
 const SIDEBAR_SORT_KEY_STORAGE_KEY = 'hermes.desktop.sidebarSortKey'
 const SIDEBAR_ROW_META_STORAGE_KEY = 'hermes.desktop.sidebarRowMeta'
 const SIDEBAR_CARD_ROWS_STORAGE_KEY = 'hermes.desktop.sidebarCardRows'
+const SIDEBAR_WHOLE_FIGURES_STORAGE_KEY = 'hermes.desktop.sidebarWholeFigures'
 const SIDEBAR_SHOW_ALL_SESSIONS_STORAGE_KEY = 'hermes.desktop.sidebarShowAllSessions'
 const SIDEBAR_STATUS_FILTER_STORAGE_KEY = 'hermes.desktop.sidebarStatusFilter'
 const SIDEBAR_SHOW_ARCHIVED_STORAGE_KEY = 'hermes.desktop.sidebarShowArchived'
@@ -352,6 +353,10 @@ export const $sidebarRowMeta = modeBound('sidebarRowMeta', $sidebarRowMetaPref, 
  *  grouping is active. Off by default; dense tree surfaces never use it. */
 export const $sidebarCardRows = persistentAtom(SIDEBAR_CARD_ROWS_STORAGE_KEY, false, Codecs.bool)
 
+/** Show the sidebar's token and cost figures as whole numbers ("15k", "$3")
+ *  instead of with tenths and cents ("15.4k", "$3.42"). Off by default. */
+export const $sidebarWholeFigures = persistentAtom(SIDEBAR_WHOLE_FIGURES_STORAGE_KEY, false, Codecs.bool)
+
 /** Project overview: two complete recency groups instead of three preview rows. */
 export const $sidebarShowAllSessions = persistentAtom(SIDEBAR_SHOW_ALL_SESSIONS_STORAGE_KEY, false, Codecs.bool)
 
@@ -361,6 +366,10 @@ export function setSidebarShowAllSessions(on: boolean) {
 
 export function setSidebarCardRows(on: boolean) {
   $sidebarCardRows.set(on)
+}
+
+export function setSidebarWholeFigures(on: boolean) {
+  $sidebarWholeFigures.set(on)
 }
 
 /** Order-insensitive: the menu appends in click order, so ['tokens','updated']
@@ -431,14 +440,16 @@ export const $sidebarViewCustomized: ReadableAtom<boolean> = computed(
     $sidebarOrdering,
     $sidebarRowMeta,
     $sidebarCardRows,
+    $sidebarWholeFigures,
     $sidebarShowAllSessions,
     $sidebarFiltersActive
   ],
-  (grouping, ordering, rowMeta, cardRows, showAllSessions, filtersActive) =>
+  (grouping, ordering, rowMeta, cardRows, wholeFigures, showAllSessions, filtersActive) =>
     grouping !== SIDEBAR_DEFAULT_GROUPING ||
     ordering !== SIDEBAR_DEFAULT_ORDERING ||
     !sameRowMeta(rowMeta, SIDEBAR_DEFAULT_ROW_META) ||
     cardRows ||
+    wholeFigures ||
     showAllSessions ||
     filtersActive
 )
@@ -947,6 +958,7 @@ export function resetSidebarView() {
   setSidebarOrdering(SIDEBAR_DEFAULT_ORDERING)
   $sidebarRowMeta.set(SIDEBAR_DEFAULT_ROW_META)
   $sidebarCardRows.set(false)
+  $sidebarWholeFigures.set(false)
   $sidebarShowAllSessions.set(false)
   clearSidebarFilters()
 }

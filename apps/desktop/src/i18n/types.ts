@@ -19,6 +19,7 @@ import type { NoticeTranslations } from './types_notices'
 import type { OnboardingTranslations } from './types_onboarding'
 import type { SidebarProjectsTranslations } from './types_projects'
 import type { SharedMetricsTranslations } from './types_shared_metrics'
+import type { SidebarFilterTranslations } from './types_sidebar_filter'
 import type { UninstallSectionTranslations } from './types_uninstall_section'
 import type { UpdateChannelCopy } from './types_update_channel'
 
@@ -2808,37 +2809,7 @@ export interface Translations extends NoticeTranslations {
   }
 
   sidebar: {
-    filter: {
-      grouping: string
-      ordering: string
-      show: string
-      filters: string
-      status: string
-      pullRequest: string
-      profile: string
-      project: string
-      archived: string
-      resetToDefaults: string
-      expandAll: string
-      collapseAll: string
-      inboxStyle: string
-      updated: string
-      created: string
-      tokens: string
-      cost: string
-      manual: string
-      preview: string
-      pr: string
-      needsInput: string
-      working: string
-      unread: string
-      draft: string
-      idle: string
-      open: string
-      merged: string
-      closed: string
-      noPR: string
-    }
+    filter: SidebarFilterTranslations
     gatewayGroups: {
       grouping: string
       rename: string

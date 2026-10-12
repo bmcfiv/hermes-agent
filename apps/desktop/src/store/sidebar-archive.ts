@@ -75,6 +75,12 @@ export async function loadArchivedSessions(): Promise<void> {
 export const sessionCostUsd = (session: SessionInfo): number =>
   session.actual_cost_usd || session.estimated_cost_usd || 0
 
+/** Sidebar spend figure. Stock is cents ("$3.42"); `whole` drops them
+ *  ("$3", "$1,235"). Whole spend under a dollar reads "<$1" — rounding it to
+ *  "$0" would look like a free session. Callers hide sub-cent spend first. */
+export const formatSidebarCost = (usd: number, whole = false): string =>
+  !whole ? `$${usd.toFixed(2)}` : usd < 1 ? '<$1' : `$${Math.round(usd).toLocaleString('en-US')}`
+
 /** Whether ANY loaded session reports spend. Subscription auth never quotes a
  *  price, so for those users a cost sort would rank a list of zeroes — the
  *  menu hides the option instead of offering a dead one. */

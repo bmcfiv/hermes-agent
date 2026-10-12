@@ -1,4 +1,3 @@
-import { compactNumber } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
 import { memo } from 'react'
 import type * as React from 'react'
@@ -26,7 +25,7 @@ import { handoffOriginSource, sessionSourceLabel } from '@/lib/session-source'
 import { coarseElapsed } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
-import { $sidebarRowMeta } from '@/store/layout'
+import { $sidebarRowMeta, $sidebarWholeFigures } from '@/store/layout'
 import { normalizeProfileKey } from '@/store/profile'
 import { $projects } from '@/store/projects'
 import { $pullRequestsByBranch, sessionPrKey } from '@/store/pull-requests'
@@ -49,6 +48,7 @@ import {
   SidebarRowLeadGlyph,
   SidebarRowShell
 } from './chrome'
+import { sidebarFigures } from './figures'
 import { shellOwnsPress } from './reorderable-list'
 import { SessionActionsMenu, SessionContextMenu } from './session-actions-menu'
 import { sessionRowDetails } from './session-row-details'
@@ -168,6 +168,7 @@ function SidebarSessionRowImpl({
   // rather than threaded as props: the subscription re-renders past the memo
   // below, and a toggle should repaint every row at once anyway.
   const rowMeta = useStore($sidebarRowMeta)
+  const wholeFigures = useStore($sidebarWholeFigures)
   // Pinned metadata occupies the actions slot and swaps out for the kebab on
   // hover, so the row reserves the same width either way and never reflows.
   const pinnedAge = rowMeta.includes('updated')
@@ -187,14 +188,7 @@ function SidebarSessionRowImpl({
   const totalTokens = session.input_tokens + session.output_tokens
   const cost = sessionCostUsd(session)
 
-  // Tokens, cost and age share one figure rather than each claiming a column:
-  // several switched on read as one number, not as a widening gutter.
-  const figures = [
-    rowMeta.includes('tokens') && totalTokens > 0 ? compactNumber(totalTokens) : null,
-    // Sub-cent spend rounds to "$0.00", which reads as a bug rather than as a
-    // cheap session — below a cent the row says nothing at all.
-    rowMeta.includes('cost') && cost >= 0.01 ? `$${cost.toFixed(2)}` : null
-  ].filter(Boolean) as string[]
+  const figures = sidebarFigures(rowMeta, totalTokens, cost, wholeFigures)
 
   // Everything the Show menu puts after the title shares ONE right-aligned
   // slot, in reading order: identity chips, then the figures. The kebab covers

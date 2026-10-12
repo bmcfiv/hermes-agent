@@ -7,7 +7,9 @@ import { $interfaceMode } from '@/store/interface-mode'
 import {
   $sidebarListGroupIds,
   $sidebarOrdering,
+  $sidebarRowMeta,
   $sidebarStatusFilter,
+  $sidebarWholeFigures,
   resetSidebarView,
   setSidebarGrouping,
   setSidebarOrdering
@@ -58,4 +60,27 @@ it('translates the live filter menu while preserving selected values and the cur
   expect(screen.getByRole('menuitemcheckbox', { name: ja.needsInput }).getAttribute('aria-checked')).toBe('true')
   expect(screen.queryByRole('menuitemcheckbox', { name: zh.needsInput })).toBeNull()
   expect($sidebarOrdering.get()).toBe('manual')
+})
+
+it('offers whole-number figures under Show only while tokens or cost is on, and toggles the setting', () => {
+  $interfaceMode.set('advanced')
+  $sidebarRowMeta.set(['updated'])
+  render(
+    <I18nProvider configClient={null} initialLocale="en">
+      <Menu />
+    </I18nProvider>
+  )
+  const f = TRANSLATIONS.en.sidebar.filter
+
+  const openShow = () => {
+    fireEvent.keyDown(screen.getByRole('button', { name: f.filters }), { key: 'Enter' })
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: new RegExp(f.show) }), { key: 'ArrowRight' })
+  }
+
+  openShow()
+  expect(screen.queryByRole('menuitemcheckbox', { name: f.wholeFigures })).toBeNull()
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: f.tokens }))
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: f.wholeFigures }))
+
+  expect($sidebarWholeFigures.get()).toBe(true)
 })

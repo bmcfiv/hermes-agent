@@ -163,6 +163,7 @@ export const arChrome = {
       expandAll: 'توسيع الكل',
       collapseAll: 'طي الكل',
       inboxStyle: 'نمط البريد الوارد',
+      wholeFigures: 'أرقام صحيحة',
       updated: 'محدّث',
       created: 'أُنشئ',
       tokens: 'الرموز',

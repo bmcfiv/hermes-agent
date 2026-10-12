@@ -6,11 +6,13 @@ import {
   $sidebarRowMeta,
   $sidebarShowAllSessions,
   $sidebarViewCustomized,
+  $sidebarWholeFigures,
   cycleSidebarGrouping,
   resetSidebarView,
   setSidebarGrouping,
   setSidebarOrdering,
   setSidebarShowAllSessions,
+  setSidebarWholeFigures,
   SIDEBAR_GROUPING_ORDER,
   type SidebarGrouping,
   toggleSidebarRowMeta,
@@ -39,6 +41,20 @@ describe('the sidebar as it ships', () => {
     expect($sidebarShowAllSessions.get()).toBe(false)
     expect($sidebarViewCustomized.get()).toBe(false)
     expect(window.localStorage.getItem('hermes.desktop.sidebarShowAllSessions')).toBe('false')
+  })
+
+  it('ships tenths and cents, and reset puts them back', () => {
+    expect($sidebarWholeFigures.get()).toBe(false)
+
+    setSidebarWholeFigures(true)
+
+    expect($sidebarViewCustomized.get()).toBe(true)
+    expect(window.localStorage.getItem('hermes.desktop.sidebarWholeFigures')).toBe('true')
+
+    resetSidebarView()
+
+    expect($sidebarWholeFigures.get()).toBe(false)
+    expect($sidebarViewCustomized.get()).toBe(false)
   })
 
   it('offers no reset until something actually moves off the defaults', () => {

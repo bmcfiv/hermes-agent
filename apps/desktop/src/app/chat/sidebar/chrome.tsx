@@ -1,4 +1,3 @@
-import { compactNumber } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 
@@ -9,9 +8,10 @@ import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { RowButton } from '@/components/ui/row-button'
 import { Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { $sidebarRowMeta } from '@/store/layout'
+import { $sidebarRowMeta, $sidebarWholeFigures } from '@/store/layout'
 import type { TileDock } from '@/store/session-states'
 
+import { sidebarFigures } from './figures'
 import {
   SIDEBAR_ROW_INSET,
   SIDEBAR_ROW_LABEL,
@@ -264,13 +264,9 @@ export function SidebarGroupRow({
   totals?: SidebarGroupTotals
 }) {
   const rowMeta = useStore($sidebarRowMeta)
+  const whole = useStore($sidebarWholeFigures)
 
-  const facts = [
-    totals && rowMeta.includes('tokens') && totals.tokens > 0 ? compactNumber(totals.tokens) : null,
-    // Sub-cent spend rounds to "$0.00", which reads as a bug rather than as a
-    // cheap group — below a cent the header says nothing at all.
-    totals && rowMeta.includes('cost') && totals.costUsd >= 0.01 ? `$${totals.costUsd.toFixed(2)}` : null
-  ].filter(Boolean) as string[]
+  const facts = totals ? sidebarFigures(rowMeta, totals.tokens, totals.costUsd, whole) : []
 
   return (
     <SidebarRowShell

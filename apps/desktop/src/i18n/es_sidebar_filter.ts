@@ -1,0 +1,35 @@
+// Los textos del menú de filtros de la barra lateral, compuestos por es.ts.
+import type { TranslationOverrides } from './define-locale'
+
+export const esSidebarFilter: NonNullable<NonNullable<TranslationOverrides['sidebar']>['filter']> = {
+  grouping: 'Agrupación',
+  ordering: 'Orden',
+  show: 'Mostrar',
+  filters: 'Filtros',
+  status: 'Estado',
+  pullRequest: 'Pull request',
+  profile: 'Perfil',
+  project: 'Proyecto',
+  archived: 'Archivados',
+  resetToDefaults: 'Restablecer valores predeterminados',
+  expandAll: 'Expandir todo',
+  collapseAll: 'Contraer todo',
+  inboxStyle: 'Estilo bandeja de entrada',
+  wholeFigures: 'Números enteros',
+  updated: 'Actualizado',
+  created: 'Creado',
+  tokens: 'Tokens',
+  cost: 'Coste',
+  manual: 'Manual',
+  preview: 'Vista previa',
+  pr: 'PR',
+  needsInput: 'Requiere respuesta',
+  working: 'Trabajando',
+  unread: 'No leídos',
+  draft: 'Borrador',
+  idle: 'Inactivo',
+  open: 'Abierta',
+  merged: 'Fusionada',
+  closed: 'Cerrada',
+  noPR: 'Sin PR'
+}

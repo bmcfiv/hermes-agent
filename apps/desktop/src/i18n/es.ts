@@ -11,6 +11,7 @@ import { esNotices } from './es_notices'
 import { esOnboarding } from './es_onboarding'
 import { esProjects } from './es_projects'
 import { esSharedMetrics } from './es_shared_metrics'
+import { esSidebarFilter } from './es_sidebar_filter'
 import { esUpdateChannel } from './es_update_channel'
 import { introEs } from './intro-es'
 
@@ -3650,37 +3651,7 @@ export const esOverrides = {
     missingBody: 'Este artefacto ya no está en el registro local.'
   },
   sidebar: {
-    filter: {
-      grouping: 'Agrupación',
-      ordering: 'Orden',
-      show: 'Mostrar',
-      filters: 'Filtros',
-      status: 'Estado',
-      pullRequest: 'Pull request',
-      profile: 'Perfil',
-      project: 'Proyecto',
-      archived: 'Archivados',
-      resetToDefaults: 'Restablecer valores predeterminados',
-      expandAll: 'Expandir todo',
-      collapseAll: 'Contraer todo',
-      inboxStyle: 'Estilo bandeja de entrada',
-      updated: 'Actualizado',
-      created: 'Creado',
-      tokens: 'Tokens',
-      cost: 'Coste',
-      manual: 'Manual',
-      preview: 'Vista previa',
-      pr: 'PR',
-      needsInput: 'Requiere respuesta',
-      working: 'Trabajando',
-      unread: 'No leídos',
-      draft: 'Borrador',
-      idle: 'Inactivo',
-      open: 'Abierta',
-      merged: 'Fusionada',
-      closed: 'Cerrada',
-      noPR: 'Sin PR'
-    },
+    filter: esSidebarFilter,
     gatewayGroups: {
       grouping: 'Gateway y perfil',
       rename: 'Renombrar grupo',

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionInfo } from '@/types/hermes'
 
-import { $archivedSessions, listEveryArchivedSession, loadArchivedSessions } from './sidebar-archive'
+import { $archivedSessions, formatSidebarCost, listEveryArchivedSession, loadArchivedSessions } from './sidebar-archive'
 
 const listAllProfileSessions = vi.hoisted(() => vi.fn())
 
@@ -133,5 +133,27 @@ describe('listEveryArchivedSession', () => {
     expect(sessions.filter(s => s.archived)).toHaveLength(total)
     // The 100 distinct pins ride along once each, not once per page.
     expect(sessions.filter(s => !s.archived)).toHaveLength(100)
+  })
+})
+
+describe('formatSidebarCost', () => {
+  it.each([
+    [0.01, '$0.01'],
+    [3.426, '$3.43'],
+    [1234.5, '$1234.50']
+  ])('%s → %s by default', (usd, expected) => {
+    expect(formatSidebarCost(usd)).toBe(expected)
+  })
+
+  it.each([
+    [0.01, '<$1'],
+    [0.99, '<$1'],
+    [1, '$1'],
+    [3.49, '$3'],
+    [3.5, '$4'],
+    [127.2, '$127'],
+    [1234.5, '$1,235']
+  ])('%s → %s whole', (usd, expected) => {
+    expect(formatSidebarCost(usd, true)).toBe(expected)
   })
 })

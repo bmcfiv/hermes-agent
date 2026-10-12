@@ -8,6 +8,7 @@ import { ruOnboarding } from './ru_onboarding'
 import { ruPluginSettings } from './ru_plugins'
 import { ruProjects } from './ru_projects'
 import { ruSharedMetrics } from './ru_shared_metrics'
+import { ruSidebarFilter } from './ru_sidebar_filter'
 import { ruUpdateChannel } from './ru_update_channel'
 
 // RU_PLURAL: (count, one, few, many) — русские формы сущ. падежа
@@ -2545,37 +2546,7 @@ export const ruOverrides = {
   },
   sidebar: {
     profileRail: 'Панель профилей',
-    filter: {
-      grouping: 'Группировка',
-      ordering: 'Сортировка',
-      show: 'Показывать',
-      inboxStyle: 'Стиль «Входящие»',
-      status: 'Статус',
-      pullRequest: 'Запрос на слияние',
-      profile: 'Профиль',
-      project: 'Проект',
-      archived: 'Архивные',
-      expandAll: 'Развернуть все',
-      collapseAll: 'Свернуть все',
-      updated: 'Обновление',
-      created: 'Создано',
-      tokens: 'Токены',
-      cost: 'Стоимость',
-      manual: 'Вручную',
-      preview: 'Превью',
-      pr: 'PR',
-      open: 'Открыт',
-      draft: 'Черновик',
-      merged: 'Слит',
-      closed: 'Закрыт',
-      needsInput: 'Нужен ввод',
-      working: 'В работе',
-      unread: 'Непрочитанные',
-      idle: 'Бездействие',
-      filters: 'Фильтры',
-      resetToDefaults: 'Сбросить настройки',
-      noPR: 'Без PR'
-    },
+    filter: ruSidebarFilter,
     gatewayGroups: {
       grouping: 'Шлюз и профиль',
       rename: 'Переименовать группу',

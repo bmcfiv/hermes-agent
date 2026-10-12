@@ -36,6 +36,7 @@ import {
   $sidebarShowArchived,
   $sidebarStatusFilter,
   $sidebarViewCustomized,
+  $sidebarWholeFigures,
   $sidebarWorkspaceNodeOpen,
   resetSidebarView,
   setSidebarCardRows,
@@ -43,6 +44,7 @@ import {
   setSidebarOrdering,
   setSidebarShowAllSessions,
   setSidebarShowArchived,
+  setSidebarWholeFigures,
   setWorkspaceNodesOpen,
   SIDEBAR_GROUPING_ORDER,
   type SidebarGrouping,
@@ -101,6 +103,24 @@ function OptionCheckbox({ checked, onCheck, option }: { checked: boolean; onChec
       <OptionGlyph option={option} />
       {option.label}
     </DropdownMenuCheckboxItem>
+  )
+}
+
+// Only meaningful while a figure is on screen; stays listed once set so it can
+// always be switched back off.
+function WholeFiguresOption({ label, rowMeta }: { label: string; rowMeta: SidebarRowMeta[] }) {
+  const whole = useStore($sidebarWholeFigures)
+
+  if (!whole && !rowMeta.includes('tokens') && !rowMeta.includes('cost')) {
+    return null
+  }
+
+  return (
+    <OptionCheckbox
+      checked={whole}
+      onCheck={() => setSidebarWholeFigures(!whole)}
+      option={{ icon: 'symbol-numeric', id: 'whole-figures', label }}
+    />
   )
 }
 
@@ -300,6 +320,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
                     option={option}
                   />
                 ))}
+                <WholeFiguresOption label={f.wholeFigures} rowMeta={rowMeta} />
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           )}

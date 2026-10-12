@@ -1,0 +1,35 @@
+// Die Filtermenü-Texte der Sidebar, zusammengesetzt von de.ts.
+import type { TranslationOverrides } from './define-locale'
+
+export const deSidebarFilter: NonNullable<NonNullable<TranslationOverrides['sidebar']>['filter']> = {
+  grouping: 'Gruppierung',
+  ordering: 'Sortierung',
+  show: 'Anzeigen',
+  filters: 'Filter',
+  status: 'Status',
+  pullRequest: 'Pull Request',
+  profile: 'Profil',
+  project: 'Projekt',
+  archived: 'Archiviert',
+  resetToDefaults: 'Auf Standard zurücksetzen',
+  expandAll: 'Alle ausklappen',
+  collapseAll: 'Alle einklappen',
+  inboxStyle: 'Posteingangsstil',
+  wholeFigures: 'Ganze Zahlen',
+  updated: 'Aktualisiert',
+  created: 'Erstellt',
+  tokens: 'Tokens',
+  cost: 'Kosten',
+  manual: 'Manuell',
+  preview: 'Vorschau',
+  pr: 'PR',
+  needsInput: 'Eingabe nötig',
+  working: 'In Arbeit',
+  unread: 'Ungelesen',
+  draft: 'Entwurf',
+  idle: 'Inaktiv',
+  open: 'Offen',
+  merged: 'Gemergt',
+  closed: 'Geschlossen',
+  noPR: 'Kein PR'
+}

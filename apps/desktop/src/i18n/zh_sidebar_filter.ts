@@ -1,0 +1,35 @@
+// 侧边栏筛选菜单文案，由 zh.ts 组合。
+import type { TranslationOverrides } from './define-locale'
+
+export const zhSidebarFilter: NonNullable<NonNullable<TranslationOverrides['sidebar']>['filter']> = {
+  grouping: '分组',
+  ordering: '排序',
+  show: '显示',
+  filters: '筛选',
+  status: '状态',
+  pullRequest: '拉取请求',
+  profile: '配置档案',
+  project: '项目',
+  archived: '已归档',
+  resetToDefaults: '重置为默认',
+  expandAll: '全部展开',
+  collapseAll: '全部折叠',
+  inboxStyle: '收件箱样式',
+  wholeFigures: '显示整数',
+  updated: '更新时间',
+  created: '创建时间',
+  tokens: '词元数',
+  cost: '费用',
+  manual: '手动',
+  preview: '预览',
+  pr: 'PR',
+  needsInput: '需要输入',
+  working: '运行中',
+  unread: '未读',
+  draft: '草稿',
+  idle: '空闲',
+  open: '打开',
+  merged: '已合并',
+  closed: '已关闭',
+  noPR: '无PR'
+}

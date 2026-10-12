@@ -54,6 +54,7 @@ export const zhHantChrome = {
       expandAll: '全部展開',
       collapseAll: '全部收合',
       inboxStyle: '收件匣樣式',
+      wholeFigures: '顯示整數',
       updated: '已更新',
       created: '已建立',
       tokens: '詞元數',

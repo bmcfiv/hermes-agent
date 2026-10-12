@@ -1,0 +1,35 @@
+// Тексты меню фильтров боковой панели, собираются в ru.ts.
+import type { TranslationOverrides } from './define-locale'
+
+export const ruSidebarFilter: NonNullable<NonNullable<TranslationOverrides['sidebar']>['filter']> = {
+  grouping: 'Группировка',
+  ordering: 'Сортировка',
+  show: 'Показывать',
+  inboxStyle: 'Стиль «Входящие»',
+  wholeFigures: 'Целые числа',
+  status: 'Статус',
+  pullRequest: 'Запрос на слияние',
+  profile: 'Профиль',
+  project: 'Проект',
+  archived: 'Архивные',
+  expandAll: 'Развернуть все',
+  collapseAll: 'Свернуть все',
+  updated: 'Обновление',
+  created: 'Создано',
+  tokens: 'Токены',
+  cost: 'Стоимость',
+  manual: 'Вручную',
+  preview: 'Превью',
+  pr: 'PR',
+  open: 'Открыт',
+  draft: 'Черновик',
+  merged: 'Слит',
+  closed: 'Закрыт',
+  needsInput: 'Нужен ввод',
+  working: 'В работе',
+  unread: 'Непрочитанные',
+  idle: 'Бездействие',
+  filters: 'Фильтры',
+  resetToDefaults: 'Сбросить настройки',
+  noPR: 'Без PR'
+}

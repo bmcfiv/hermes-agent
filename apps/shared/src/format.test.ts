@@ -26,3 +26,19 @@ describe('compactNumber', () => {
     }
   })
 })
+
+describe('compactNumber whole', () => {
+  it.each([
+    [0, '0'],
+    [999, '999'],
+    [1230, '1k'],
+    [1500, '2k'],
+    [15_400, '15k'],
+    [999_499, '999k'],
+    [999_500, '1M'],
+    [1_500_000, '2M'],
+    [12_340_000, '12M']
+  ])('%s → %s', (value, expected) => {
+    expect(compactNumber(value, { whole: true })).toBe(expected)
+  })
+})
