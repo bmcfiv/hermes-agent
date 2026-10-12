@@ -4,6 +4,7 @@ import { defineLocale, type TranslationOverrides } from './define-locale'
 import { introZh } from './intro-zh'
 import { zhAuxTasks } from './zh_aux_tasks'
 import { zhConnectorCard } from './zh_connector_card'
+import { zhLinkSettings } from './zh_link_settings'
 import { zhLocalModels } from './zh_local_models'
 import { zhModelMenu } from './zh_model_menu'
 import { zhNotices } from './zh_notices'
@@ -1272,9 +1273,7 @@ export const zhOverrides = {
       keepAwakeAlways: '始终',
       disableF12Title: '禁用 F12 开发者工具',
       disableF12Desc: '阻止 F12 打开开发者工具。Ctrl+Shift+I（Mac 上为 Cmd+Opt+I）仍然可用。',
-      alwaysExternalLinksTitle: '始终在外部浏览器中打开链接',
-      alwaysExternalLinksDesc:
-        '点击的每个链接都在系统浏览器中打开，而不是应用内浏览器。右键菜单中的“在应用内浏览器中打开”仍然可用。',
+      links: zhLinkSettings,
       developerTitle: '开发者',
       resetOnboardingTitle: '重置新手引导',
       resetOnboardingDesc: '删除设置对话，重建设置配置文件，并重新运行首次设置。你自己的配置文件、对话和插件会保留。',

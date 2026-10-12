@@ -7,6 +7,7 @@ import { enBoot } from './en_boot'
 import { enCatalogInstall } from './en_catalog_install'
 import { enConnectorAccounts } from './en_connector_accounts'
 import { enConnectorCard } from './en_connector_card'
+import { enLinkSettings } from './en_link_settings'
 import { enLocalModels } from './en_local_models'
 import { enModelMenu } from './en_model_menu'
 import { enNotices } from './en_notices'
@@ -1218,9 +1219,7 @@ export const en: Translations = {
       keepAwakeAlways: 'Always',
       disableF12Title: 'Disable F12 DevTools',
       disableF12Desc: 'Block F12 from opening Developer Tools. Ctrl+Shift+I (or Cmd+Opt+I on Mac) still works.',
-      alwaysExternalLinksTitle: 'Always open links in external browser',
-      alwaysExternalLinksDesc:
-        'Open every link you click in your system browser instead of the in-app browser. "Open in in-app browser" in the right-click menu still works.',
+      links: enLinkSettings,
       developerTitle: 'Developer',
       resetOnboardingTitle: 'Reset onboarding',
       resetOnboardingDesc:

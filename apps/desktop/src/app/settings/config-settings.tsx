@@ -51,6 +51,7 @@ import {
 import { MemoryConnect } from './memory/connect'
 import { ProviderConfigPanel } from './memory/provider-config-panel'
 import { ModelSettings, ModelSettingsSkeleton } from './model-settings'
+import { OpenLinksInChromeSetting } from './open-links-in-chrome-setting'
 import { PoolLimitsSetting } from './pool-limits-setting'
 import { EmptyState, ListRow, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import { SettingsProfileScope } from './profile-scope'
@@ -480,10 +481,11 @@ function ConfigSettingsInner({
           />
           <ToggleRow
             checked={alwaysExternalLinks}
-            description={c.alwaysExternalLinksDesc}
-            label={c.alwaysExternalLinksTitle}
+            description={c.links.alwaysExternalDesc}
+            label={c.links.alwaysExternalTitle}
             onChange={setAlwaysExternalLinks}
           />
+          <OpenLinksInChromeSetting />
           <PoolLimitsSetting />
           <QuickEntrySettings />
           <DeveloperSettings />

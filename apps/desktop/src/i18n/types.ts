@@ -14,6 +14,7 @@ import type { BillingTranslations } from './types_billing'
 import type { BootTranslations } from './types_boot'
 import type { CatalogInstallTranslations } from './types_catalog_install'
 import type { ConnectorAccountsTranslations, ConnectorCardTranslations } from './types_connectors'
+import type { LinkSettingsCopy } from './types_link_settings'
 import type { ModelMenuTranslations } from './types_model_menu'
 import type { NoticeTranslations } from './types_notices'
 import type { OnboardingTranslations } from './types_onboarding'
@@ -1002,8 +1003,7 @@ export interface Translations extends NoticeTranslations {
       keepAwakeAlways: string
       disableF12Title: string
       disableF12Desc: string
-      alwaysExternalLinksTitle: string
-      alwaysExternalLinksDesc: string
+      links: LinkSettingsCopy
       developerTitle: string
       resetOnboardingTitle: string
       resetOnboardingDesc: string

@@ -127,6 +127,7 @@ import {
 } from './bundle-swap'
 import { CHALLENGE_PARTITION } from './challenge-window'
 import { registerChallengeWindowIpc } from './challenge-window-ipc'
+import { openWebLink, systemChromeOpenDeps } from './chrome-open'
 import { provisionCliLinks } from './cli-provision'
 import { closeStopFailureMessage, finishWindowsCloseStop, type RuntimeLock } from './close-stop-kill'
 import { shouldAttemptCloudBootCascade } from './cloud-boot-cascade'
@@ -424,6 +425,7 @@ import { wireOauthSessionResponse } from './oauth-session-response'
 import { listWindowsProcesses, reapPackageRootedProcesses } from './package-process-reap'
 import { createParentStartMarkerResolver, parentWatchdogEnv } from './parent-process-identity'
 import { bundledPayload, installIdForRoot, type PayloadInfo, payloadPythonPath } from './payload-backend'
+import { createPersistedFlag } from './persisted-flag'
 import { petOverlayClickThrough, shouldPopInOnOverlayClosed } from './pet-overlay'
 import { placePetOverlay, registerPetOverlayIpc } from './pet-overlay-ipc'
 import {
@@ -2435,10 +2437,14 @@ function loadWindowUrl(win, url, label) {
   win.loadURL(url).catch(error => rememberLog(`${label} failed to load: ${describeCrashReason(error)}`))
 }
 
+// Opt-in "Open links in Google Chrome" (macOS); a miss falls back to the OS default.
+let openLinksInChrome = false
+
 const EXTERNAL_OPEN_DEPS: ExternalOpenDeps = {
   isWsl: IS_WSL,
   spawn: (cmd, args, opts) => spawn(cmd, args, opts),
-  openExternal: url => shell.openExternal(url),
+  openExternal: url =>
+    openWebLink(url, openLinksInChrome, systemChromeOpenDeps(rememberLog), target => shell.openExternal(target)),
   openFile: openExternalFile,
   openLocalPath: openLocalFilesystemPath,
   notifyFailure: broadcastOpenFailed,
@@ -18401,28 +18407,20 @@ ipcMain.on('hermes:quick-entry:state', (_event, payload) => {
 
 ipcMain.on('hermes:quick-entry:dismiss', () => hideQuickEntryWindow())
 
-// Disable F12 DevTools: maintained in the main process so a cold launch
-// restores it before any window is shown (applied on ready). The renderer
-// toggles it from Settings → Advanced over IPC. See store/disable-f12.
-const DISABLE_F12_CONFIG_PATH = path.join(app.getPath('userData'), 'disable-f12.json')
-
-function readPersistedDisableF12() {
-  try {
-    return JSON.parse(fs.readFileSync(DISABLE_F12_CONFIG_PATH, 'utf8')).on === true
-  } catch {
-    return false
-  }
-}
+// Disable F12 DevTools and Open links in Google Chrome: kept in the main process
+// so a cold launch restores them before any window is shown (applied on ready);
+// the renderer toggles them over IPC (store/disable-f12, store/open-links-in-chrome).
+const disableF12Flag = createPersistedFlag(app.getPath('userData'), 'disable-f12', rememberLog)
+const openLinksInChromeFlag = createPersistedFlag(app.getPath('userData'), 'open-links-in-chrome', rememberLog)
 
 ipcMain.on('hermes:devtools:disable-f12', (_event, on) => {
   f12Blocked = Boolean(on)
+  disableF12Flag.write(f12Blocked)
+})
 
-  try {
-    fs.mkdirSync(path.dirname(DISABLE_F12_CONFIG_PATH), { recursive: true })
-    fs.writeFileSync(DISABLE_F12_CONFIG_PATH, JSON.stringify({ on: f12Blocked }, null, 2), 'utf8')
-  } catch (error) {
-    rememberLog(`[disable-f12] write failed: ${error.message}`)
-  }
+ipcMain.on('hermes:links:open-in-chrome', (_event, on) => {
+  openLinksInChrome = on === true
+  openLinksInChromeFlag.write(openLinksInChrome)
 })
 
 // Free-tier browser challenge: a hidden portal window (electron/challenge-window.ts).
@@ -19378,7 +19376,8 @@ app.whenReady().then(() => {
   applyKeepAwake()
   void minimizeToTray.start()
   mainProcessLagWatchdog.start()
-  f12Blocked = readPersistedDisableF12()
+  f12Blocked = disableF12Flag.read()
+  openLinksInChrome = openLinksInChromeFlag.read()
   // Seed this before the first window exists: a picker can open before
   // startHermes() finishes resolving the configured backend.
   const primaryProfile = primaryProfileKey()
