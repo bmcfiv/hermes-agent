@@ -85,6 +85,8 @@ function installAgentDesktop(): DesktopStub {
 
 beforeEach(() => {
   configureGatewayRegistry({ onEvent: vi.fn() })
+  gatewayMocks.connect.mockReset()
+  gatewayMocks.connect.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -94,6 +96,61 @@ afterEach(() => {
 })
 
 describe('secondary activation requires an open socket, not just a connection descriptor (issue #92265)', () => {
+  it('retries one websocket handshake timeout and loads the instance when the second dial opens', async () => {
+    const primary = makePrimary()
+    setPrimaryGateway(primary as never, 'default')
+    installAgentDesktop()
+
+    gatewayMocks.connect
+      .mockRejectedValueOnce(
+        new Error('Could not connect to Hermes gateway (no WebSocket open within 15000 ms)')
+      )
+      .mockResolvedValueOnce(undefined)
+
+    const activated = await ensureGatewayForAgent('homelab', 'research')
+
+    expect(gatewayMocks.connect).toHaveBeenCalledTimes(2)
+    expect(activated).toBe(true)
+    expect(isActivePrimary()).toBe(false)
+    expect(activeGateway()).not.toBe(primary)
+  })
+
+  it('does not activate when the websocket handshake times out twice', async () => {
+    const primary = makePrimary()
+    setPrimaryGateway(primary as never, 'default')
+    await ensureGatewayForProfile('default')
+    const publishedPrimary = $gateway.get()
+    installAgentDesktop()
+
+    gatewayMocks.connect.mockRejectedValue(
+      new Error('Could not connect to Hermes gateway (no WebSocket open within 15000 ms)')
+    )
+
+    const activated = await ensureGatewayForAgent('homelab', 'research')
+
+    expect(gatewayMocks.connect).toHaveBeenCalledTimes(2)
+    expect(activated).toBe(false)
+    expect(isActivePrimary()).toBe(true)
+    expect(activeGateway()).toBe(primary)
+    expect($gateway.get()).toBe(publishedPrimary)
+  })
+
+  it('does not retry an auth close (4401) — the second dial would hit the same wall', async () => {
+    const primary = makePrimary()
+    setPrimaryGateway(primary as never, 'default')
+    installAgentDesktop()
+
+    gatewayMocks.connect.mockRejectedValue(
+      new Error('Could not connect to Hermes gateway (WebSocket closed during handshake: code 4401 unauthorized)')
+    )
+
+    const activated = await ensureGatewayForAgent('homelab', 'research')
+
+    expect(gatewayMocks.connect).toHaveBeenCalledTimes(1)
+    expect(activated).toBe(false)
+    expect(isActivePrimary()).toBe(true)
+  })
+
   it('ensureGatewayForAgent: a transient first-dial failure does not activate or publish the closed gateway', async () => {
     const primary = makePrimary()
     setPrimaryGateway(primary as never, 'default')
