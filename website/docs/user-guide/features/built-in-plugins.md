@@ -56,6 +56,7 @@ The repo ships these bundled plugins under `plugins/`. All are opt-in — enable
 | Plugin | Kind | Purpose |
 |---|---|---|
 | `disk-cleanup` | hooks + slash command | Auto-track ephemeral files and clean them on session end |
+| `auto-continuation` | hooks | When a session gets too long or too expensive, write a ready-to-paste continuation prompt for a fresh chat and append it to the reply once |
 | `security-guidance` | hooks | Pattern-match dangerous code on `write_file`/`patch` and append a security warning (or block) — 25 rules (Apache-2.0 fork of Anthropic's `claude-plugins-official` patterns) |
 | `teams_pipeline` | standalone | Microsoft Teams meeting pipeline — Graph-backed, transcript-first meeting summaries |
 | `google_meet` | standalone | Join Meet calls, live-caption transcription, optional realtime duplex audio |
@@ -115,6 +116,28 @@ Auto-tracks and removes ephemeral files created during sessions — test scripts
 **Enabling:** `hermes plugins enable disk-cleanup` (or check the box in `hermes plugins`).
 
 **Disabling again:** `hermes plugins disable disk-cleanup`.
+
+### auto-continuation
+
+A long session gets slow and expensive, and compaction loses detail. This plugin watches three limits and, the first time one trips for a session, asks the model to write a self-contained continuation prompt (goal, done so far with file paths and IDs, what is running, next steps, what "done" means). The prompt is appended to that reply in a code block and saved to `<HERMES_HOME>/continuations/<session_id>.md`. It fires once per session; a failed attempt is retried at most twice. Cron sessions are skipped.
+
+| Hook | Behaviour |
+|---|---|
+| `pre_llm_call` | Remembers the conversation so far (the reply hook only receives the session id). |
+| `post_api_request` | Remembers the last prompt size and the model's context window. |
+| `transform_llm_output` | Checks the limits; on the first trip, calls `ctx.llm` once (on the active model, bounded ~60k-char transcript digest) and appends the prompt. |
+
+Settings (`plugins.entries.auto-continuation.settings`, also in the Desktop Plugins form):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `context_percent` | `40` | Last prompt filled this % of the context window. Keep it below `compression.threshold` (default 50) so it fires before auto-compression. `0` = off. |
+| `cost_usd` | `5.0` | Session cost so far. `0` = off. |
+| `messages` | `200` | Messages in the session. `0` = off. |
+| `header` | `Continues: {session_id}` | First lines of the prompt; `{session_id}`, `{model}`, `{title}` are filled in. |
+| `header_command` | empty | Optional command (run without a shell, 10 s timeout, `HERMES_SESSION_ID` set) whose stdout goes under the header — for a house title or tracking line. |
+| `extra_instructions` | empty | Extra guidance for the model that writes the prompt. |
+| `output_dir` | `<HERMES_HOME>/continuations` | Where the `.md` copy is saved. |
 
 ### security-guidance
 

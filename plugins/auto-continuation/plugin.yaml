@@ -1,0 +1,16 @@
+name: auto-continuation
+version: 1.0.0
+description: "When a session gets too long or too expensive (context fill, session cost, message count), write a ready-to-paste continuation prompt for a fresh session and append it to the reply once."
+author: "NousResearch"
+provides_hooks:
+  - pre_llm_call
+  - post_api_request
+  - transform_llm_output
+config_schema:
+  context_percent: {type: int, default: 40, description: "Trigger when the last prompt filled this % of the model's context window (0 = off). Keep it below compression.threshold so it fires before auto-compression."}
+  cost_usd: {type: float, default: 5.0, description: "Trigger when this session's estimated cost reaches this many USD (0 = off)."}
+  messages: {type: int, default: 200, description: "Trigger when the session holds this many messages (0 = off)."}
+  header: {type: str, default: "Continues: {session_id}", description: "First lines of the continuation prompt. Placeholders: {session_id}, {model}, {title}."}
+  header_command: {type: str, default: "", description: "Optional command (no shell) whose stdout is added under the header. HERMES_SESSION_ID is set. Failures are ignored."}
+  extra_instructions: {type: str, default: "", description: "Extra guidance for the model that writes the prompt (house style, required sections)."}
+  output_dir: {type: str, default: "", description: "Also save each prompt here as <session_id>.md. Empty = <HERMES_HOME>/continuations."}
