@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createClientSessionState } from '@/lib/chat-runtime'
 import type { SessionInfo } from '@/types/hermes'
 
+import { $backgroundStatusBySession, type ComposerStatusItem } from './composer-status'
 import {
   $cronSessions,
   $messagingSessions,
@@ -238,5 +239,74 @@ describe('$unreadSessionCount (titlebar badge)', () => {
 
     expect($unreadSessionCount.get()).toBe(0)
     expect($sessionDotStateById.get()['cron-1']).not.toBe('unread')
+  })
+})
+
+describe('unread vs background work', () => {
+  const runningProc = { id: 'p1', state: 'running', title: 'server', type: 'background' } satisfies ComposerStatusItem
+
+  const subagent = {
+    id: 'sub-1',
+    parentId: null,
+    goal: 'do a thing',
+    status: 'running',
+    taskCount: 1,
+    taskIndex: 0,
+    startedAt: 0,
+    updatedAt: 0,
+    filesRead: [],
+    filesWritten: [],
+    stream: []
+  } as SubagentProgress
+
+  const reset = () => {
+    clearAllSessionStates()
+    $sessions.set([])
+    $unreadFinishedSessionIds.set([])
+    $unreadWriteGuard.set(new Map())
+    $backgroundStatusBySession.set({})
+    $subagentsBySession.set({})
+  }
+
+  beforeEach(reset)
+  afterEach(reset)
+
+  it('paints a finished turn unread even while a background process outlives it', () => {
+    setSessions([storedRow('s1')])
+    publishSessionState('rt-1', { ...createClientSessionState('s1'), busy: false })
+    $backgroundStatusBySession.set({ 'rt-1': [runningProc] })
+    expect($sessionDotStateById.get()['s1']).toBe('background')
+
+    $unreadFinishedSessionIds.set(['s1'])
+    expect($sessionDotStateById.get()['s1']).toBe('unread')
+
+    $unreadFinishedSessionIds.set([])
+    expect($sessionDotStateById.get()['s1']).toBe('background')
+  })
+
+  it('paints a finished turn unread while a delegated subagent is still running', () => {
+    setSessions([storedRow('s1')])
+    publishSessionState('rt-1', { ...createClientSessionState('s1'), busy: false })
+    $subagentsBySession.set({ 'rt-1': [subagent] })
+    $unreadFinishedSessionIds.set(['s1'])
+
+    expect($sessionDotStateById.get()['s1']).toBe('unread')
+  })
+
+  it('persisted unread also outranks background work', () => {
+    setSessions([storedRow('s1', { unread: true })])
+    publishSessionState('rt-1', { ...createClientSessionState('s1'), busy: false })
+    $backgroundStatusBySession.set({ 'rt-1': [runningProc] })
+
+    expect($sessionDotStateById.get()['s1']).toBe('unread')
+  })
+
+  it('a live turn still outranks unread', () => {
+    setSessions([storedRow('s1')])
+    publishSessionState('rt-1', { ...createClientSessionState('s1'), busy: true })
+    $backgroundStatusBySession.set({ 'rt-1': [runningProc] })
+    $unreadFinishedSessionIds.set(['s1'])
+
+    expect($sessionDotStateById.get()['s1']).toBe('working')
   })
 })

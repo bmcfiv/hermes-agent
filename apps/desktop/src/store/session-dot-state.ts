@@ -129,6 +129,21 @@ export const $sessionDotStateById = computed(
     // Draft is weakest of all: it says only "no turn has happened here yet", so
     // the first thing that does happen speaks over it.
     claim(draft, 'draft')
+
+    // Background work and async delegation are WEAKER than unread: a turn that
+    // finished while the user was elsewhere must paint green even when a
+    // terminal(background=true) process or a delegated subagent outlives it.
+    // On a server-heavy backend (work-mini) nearly every finished turn leaves
+    // one, so the hollow "still open" dot hid every completion. The hollow dot
+    // returns once the session is read; `working` below still outranks both,
+    // so a live turn is never green.
+    claim(background, 'background')
+    // Async delegation: the parent turn has ended but its subagents are still
+    // running, so the session's work continues in child sessions. Same visual
+    // claim as background processes — and it yields to `working` below the
+    // moment the parent turn itself is live (synchronous orchestrator children).
+    claim(delegating, 'background')
+
     claim(unread, 'unread')
 
     // Persisted read state (backend watermark): a row marked unread keeps the
@@ -157,12 +172,6 @@ export const $sessionDotStateById = computed(
 
     claim(persistedUnread, 'unread')
 
-    claim(background, 'background')
-    // Async delegation: the parent turn has ended but its subagents are still
-    // running, so the session's work continues in child sessions. Same visual
-    // claim as background processes — and it yields to `working` below the
-    // moment the parent turn itself is live (synchronous orchestrator children).
-    claim(delegating, 'background')
     claim(working, 'working')
 
     // Stalled REFINES working rather than rivalling it — the turn is still
