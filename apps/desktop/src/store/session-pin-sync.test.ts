@@ -504,6 +504,93 @@ describe('watchSessionPins remote pull', () => {
     expect(patch).toHaveBeenCalledWith('failed', true, undefined)
   })
 
+  it('keeps an unpin from coming back while a refused write is retried', async () => {
+    // The fenced session write rejects (revision_conflict / session_busy) when a
+    // running chat's revision moves between the snapshot and the PATCH. The
+    // unpin has no caller to retry it, so a swallowed rejection left the server
+    // pinned and the next list page re-adopted the pin the user had removed.
+    vi.useFakeTimers()
+
+    try {
+      $sessions.set([row('busy', { pinned: true })])
+      await flush()
+      expect($pinnedSessionIds.get()).toEqual(['busy'])
+      patch.mockClear()
+
+      patch
+        .mockImplementationOnce(() => Promise.reject(new Error('409: {"detail":"revision_conflict"}')))
+        .mockImplementationOnce(() => Promise.reject(new Error('409: {"detail":"session_busy"}')))
+
+      $pinnedSessionIds.set([])
+      await vi.advanceTimersByTimeAsync(0)
+      expect(patch).toHaveBeenCalledTimes(1)
+
+      // A page lands while the retry sleeps; the server still says pinned.
+      await vi.advanceTimersByTimeAsync(300)
+      $sessions.set([row('busy', { pinned: true })])
+      await vi.advanceTimersByTimeAsync(0)
+      expect($pinnedSessionIds.get()).not.toContain('busy')
+
+      // Retries land; the third write is accepted.
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(patch).toHaveBeenCalledTimes(3)
+      expect(patch).toHaveBeenLastCalledWith('busy', false, undefined)
+
+      // The server has caught up: the next page agrees and nothing re-pins.
+      $sessions.set([row('busy', { pinned: false })])
+      await vi.advanceTimersByTimeAsync(11_000)
+      expect($pinnedSessionIds.get()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops retrying an unpin once the user pins the chat again', async () => {
+    vi.useFakeTimers()
+
+    try {
+      $sessions.set([row('flip', { pinned: true })])
+      await flush()
+      patch.mockClear()
+
+      patch.mockImplementationOnce(() => Promise.reject(new Error('409: {"detail":"revision_conflict"}')))
+
+      $pinnedSessionIds.set([])
+      await vi.advanceTimersByTimeAsync(0)
+      expect(patch).toHaveBeenCalledTimes(1)
+
+      $pinnedSessionIds.set(['flip'])
+      await vi.advanceTimersByTimeAsync(0)
+      patch.mockClear()
+
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(patch).not.toHaveBeenCalledWith('flip', false, undefined)
+      expect($pinnedSessionIds.get()).toEqual(['flip'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not retry an unpin the backend definitively refuses', async () => {
+    vi.useFakeTimers()
+
+    try {
+      $sessions.set([row('gone', { pinned: true })])
+      await flush()
+      patch.mockClear()
+
+      patch.mockImplementationOnce(() => Promise.reject(new Error('404: {"detail":"not_found"}')))
+
+      $pinnedSessionIds.set([])
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(patch).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not oscillate when two profiles share a session id with conflicting pins', async () => {
     // The cross-profile list can hold the same durable id twice with opposite
     // `pinned` flags (copied/imported profile DBs). A profile-blind pull would

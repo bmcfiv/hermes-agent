@@ -191,30 +191,98 @@ function applyRowPinned(pinId: string, pinned: boolean, profile?: null | string)
   setMessagingSessions(patchRows)
 }
 
+// An UNPIN the backend refused or could not take is retried here, because its
+// caller has nothing left to retry with: the local pin is already gone, so a
+// dropped write leaves the server pinned and the very next list page re-adopts
+// the pin the user just removed ("I unpinned it and it came back"). Pins have
+// the opposite shape (the id stays in the local set, so the next reconcile
+// re-sends it) and keep that path. The fenced session write rejects on a
+// revision conflict whenever the session's runtime revision moves between the
+// snapshot read and the PATCH, which a running chat does constantly, and a
+// busy/compressing session refuses sidebar edits outright for a while.
+const UNPIN_RETRY_DELAYS_MS = [500, 1_500, 4_000, 10_000, 20_000]
+
+// Rejections that retrying cannot fix. Anything else (revision/generation
+// conflict, busy, storage or transport trouble) is worth another snapshot.
+const DEFINITIVE_REFUSAL =
+  /not_found|permission_denied|session_superseded|invalid_params|profile_mismatch|mutation_identity_required|upgrade|\b404\b/i
+
+// Bumped by anything that invalidates in-flight bookkeeping (connection rescope,
+// pruning a dead id) so a sleeping retry never writes to the wrong backend.
+let writeEpoch = 0
+// id -> the newest write's ticket; an older write's retries stop once a newer
+// toggle for the same id exists (unpin -> pin -> unpin must end unpinned).
+const writeTicket = new Map<string, number>()
+let nextTicket = 0
+
 /** PATCH the flag, guarding reads against pages that predate the write. */
 function writePin(id: string, pinned: boolean, profile?: null | string): Promise<void> {
+  const ticket = ++nextTicket
+  const epoch = writeEpoch
+  writeTicket.set(id, ticket)
+
   unconfirmed.set(id, { at: Date.now(), value: pinned })
   applyRowPinned(id, pinned, profile)
 
-  return setSessionPinnedRemote(id, pinned, profile).then(
-    () => {
-      // Deliberately NOT cleared here: a list request issued before this PATCH
-      // can still land after the ack carrying the pre-write value. The guard
-      // is released by pullRemotePins when a page confirms the written value,
-      // or by the cooldown if none ever does.
-    },
-    (err: unknown) => {
-      // A failed write leaves the server on the old value, so the guard would
-      // be fencing out the truth. Drop it and let the page win.
-      // The painted rows are left as-is (pin or unpin alike): a failed pin is
-      // retried by the caller (repainting here would fire a reconcile before
-      // that retry is booked and drop the pin), a failed unpin keeps the local
-      // value until the next real page, and the next page replaces them anyway.
-      unconfirmed.delete(id)
-      publishUnconfirmed()
-      throw err
-    }
-  )
+  const attempt = (retry: number): Promise<void> =>
+    setSessionPinnedRemote(id, pinned, profile).then(
+      () => {
+        // Deliberately NOT cleared here: a list request issued before this PATCH
+        // can still land after the ack carrying the pre-write value. The guard
+        // is released by pullRemotePins when a page confirms the written value,
+        // or by the cooldown if none ever does.
+        if (writeTicket.get(id) === ticket) {
+          writeTicket.delete(id)
+        }
+      },
+      (err: unknown) => {
+        const delay = UNPIN_RETRY_DELAYS_MS[retry]
+
+        if (
+          !pinned &&
+          delay !== undefined &&
+          !DEFINITIVE_REFUSAL.test(String(err)) &&
+          writeTicket.get(id) === ticket &&
+          writeEpoch === epoch
+        ) {
+          // Keep the fence up across the wait (the cooldown counts from `at`,
+          // so push it past the sleep) and try again with a fresh snapshot.
+          unconfirmed.set(id, { at: Date.now() + delay, value: pinned })
+          publishUnconfirmed()
+
+          return new Promise<void>(resolve => setTimeout(resolve, delay)).then(() => {
+            if (writeTicket.get(id) !== ticket || writeEpoch !== epoch) {
+              return
+            }
+
+            unconfirmed.set(id, { at: Date.now(), value: pinned })
+
+            return attempt(retry + 1)
+          })
+        }
+
+        // A failed write leaves the server on the old value, so the guard would
+        // be fencing out the truth. Drop it and let the page win.
+        // The painted rows are left as-is (pin or unpin alike): a failed pin is
+        // retried by the caller (repainting here would fire a reconcile before
+        // that retry is booked and drop the pin), a failed unpin keeps the local
+        // value until the next real page, and the next page replaces them anyway.
+        // Only the newest write for this id owns the fence; a superseded one
+        // must not tear down the guard its replacement just raised.
+        if (writeTicket.get(id) === ticket) {
+          writeTicket.delete(id)
+
+          if (writeEpoch === epoch) {
+            unconfirmed.delete(id)
+            publishUnconfirmed()
+          }
+        }
+
+        throw err
+      }
+    )
+
+  return attempt(0)
 }
 
 /**
@@ -389,6 +457,8 @@ export function watchSessionPins(): void {
  * the same path that migrates pre-existing pins at boot.
  */
 export function resetSessionPinMirror(): void {
+  writeEpoch++
+  writeTicket.clear()
   mirrored.clear()
   pending.clear()
   unconfirmed.clear()
@@ -402,6 +472,7 @@ export function resetSessionPinMirror(): void {
  * produce exactly the 404 the prune exists to remove.
  */
 export function forgetPinSyncState(id: string): void {
+  writeTicket.delete(id)
   mirrored.delete(id)
   pending.delete(id)
   unconfirmed.delete(id)
