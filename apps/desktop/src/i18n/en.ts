@@ -3178,6 +3178,7 @@ export const en: Translations = {
       actions: 'Group actions'
     },
     profileRail: 'Profile rail',
+    profileTwoLetterTiles: 'Two-letter profile tiles',
     nav: {
       'new-session': 'New session',
       capabilities: 'Capabilities',

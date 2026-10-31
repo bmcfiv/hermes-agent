@@ -2370,6 +2370,7 @@ export const ruOverrides = {
   },
   sidebar: {
     profileRail: 'Панель профилей',
+    profileTwoLetterTiles: 'Плитки профилей из двух букв',
     filter: {
       grouping: 'Группировка',
       ordering: 'Сортировка',

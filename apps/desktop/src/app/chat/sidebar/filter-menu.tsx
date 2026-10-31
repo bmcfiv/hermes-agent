@@ -61,7 +61,12 @@ import {
   requestProfileCreate,
   toggleShowAllProfiles
 } from '@/store/profile'
-import { $profileRailVisible, toggleProfileRailVisible } from '@/store/profile-rail-prefs'
+import {
+  $profileRailVisible,
+  $profileTwoLetterTiles,
+  toggleProfileRailVisible,
+  toggleProfileTwoLetterTiles
+} from '@/store/profile-rail-prefs'
 import { runImportProfileFlow } from '@/store/profile-share'
 import { $projectTree } from '@/store/projects'
 import type { PullRequestBucket } from '@/store/pull-requests'
@@ -101,6 +106,26 @@ function OptionCheckbox({ checked, onCheck, option }: { checked: boolean; onChec
       <OptionGlyph option={option} />
       {option.label}
     </DropdownMenuCheckboxItem>
+  )
+}
+
+// Initials instead of one letter on the profile rail's tiles, so same-initial
+// profiles read apart. Only offered while the rail itself is showing.
+function ProfileTwoLetterOption({ advanced }: { advanced: boolean }) {
+  const { t } = useI18n()
+  const railVisible = useStore($profileRailVisible)
+  const checked = useStore($profileTwoLetterTiles)
+
+  if (!advanced || !railVisible) {
+    return null
+  }
+
+  return (
+    <OptionCheckbox
+      checked={checked}
+      onCheck={toggleProfileTwoLetterTiles}
+      option={{ icon: 'symbol-string', id: 'profile-two-letter-tiles', label: t.sidebar.profileTwoLetterTiles }}
+    />
   )
 }
 
@@ -330,6 +355,8 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
               option={{ icon: 'organization', id: 'profile-rail', label: t.sidebar.profileRail }}
             />
           )}
+
+          <ProfileTwoLetterOption advanced={showsAdvancedChrome} />
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />

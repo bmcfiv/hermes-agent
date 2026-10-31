@@ -3065,6 +3065,7 @@ export const zhOverrides = {
       noPR: '无PR'
     },
     profileRail: '配置档案栏',
+    profileTwoLetterTiles: '双字母配置档案图块',
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',

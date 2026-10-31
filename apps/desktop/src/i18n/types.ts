@@ -2791,6 +2791,7 @@ export interface Translations extends NoticeTranslations {
       actions: string
     }
     profileRail: string
+    profileTwoLetterTiles: string
     nav: Record<string, string>
     searchAria: string
     searchPlaceholder: string

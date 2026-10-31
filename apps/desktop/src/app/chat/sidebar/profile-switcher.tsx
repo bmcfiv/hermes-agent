@@ -88,6 +88,7 @@ import {
   sortByProfileOrder
 } from '@/store/profile'
 import { $profileDotStateByScope, type ProfileDotSummary, profileDotSummaryFor } from '@/store/profile-dot-state'
+import { $profileTwoLetterTiles } from '@/store/profile-rail-prefs'
 import {
   $profileRemoteOverrides,
   openRemoteOverrideDialog,
@@ -1301,6 +1302,7 @@ function RestSquare({
   pending: boolean
 }) {
   const { t } = useI18n()
+  const tile = useProfileTile()
   const p = t.profiles
   const hue = color ?? 'var(--ui-text-quaternary)'
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -1329,7 +1331,10 @@ function RestSquare({
                   <button
                     aria-busy={pending || undefined}
                     aria-label={statusText ? `${label}, ${statusText}` : label}
-                    className="relative grid size-5 shrink-0 select-none place-items-center rounded-[3px] text-[0.5625rem] font-semibold uppercase leading-none opacity-35 transition-opacity hover:opacity-100 aria-busy:opacity-100"
+                    className={cn(
+                      'relative grid shrink-0 select-none place-items-center rounded-[3px] text-[0.5625rem] font-semibold uppercase leading-none opacity-35 transition-opacity hover:opacity-100 aria-busy:opacity-100',
+                      tile.sizeClass
+                    )}
                     data-connection-id={agent.connectionId}
                     data-profile={agent.profile}
                     data-slot="profile-rail-rest-square"
@@ -1340,7 +1345,7 @@ function RestSquare({
                     {pending ? (
                       <Loader2 aria-hidden="true" className="size-3 animate-spin" />
                     ) : (
-                      profileShortLabel(agent.profile)
+                      tile.face(agent.profile)
                     )}
                     {summary && (
                       <span className="absolute -bottom-0.5 -right-0.5">
@@ -1427,6 +1432,17 @@ interface ProfileSquareProps {
   remoteHost: null | string
 }
 
+// A tile's face and footprint, from the two-letter preference: one mark in a
+// square, or two in a square that grows just enough to hold them.
+function useProfileTile() {
+  const twoLetters = useStore($profileTwoLetterTiles)
+
+  return {
+    face: (label: string) => profileShortLabel(label, twoLetters ? 2 : 1),
+    sizeClass: twoLetters ? 'h-5 min-w-5 px-1' : 'size-5'
+  }
+}
+
 // Hold this long without moving (a drag would have started first) to open the
 // color picker — the "hard press" gesture, distinct from tap-to-select.
 const LONG_PRESS_MS = 450
@@ -1453,6 +1469,7 @@ function ProfileSquare({
   remoteHost
 }: ProfileSquareProps) {
   const { t } = useI18n()
+  const tile = useProfileTile()
   const p = t.profiles
   const hue = color ?? 'var(--ui-text-quaternary)'
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -1509,10 +1526,12 @@ function ProfileSquare({
                 <TooltipTrigger asChild>
                   <button
                     className={cn(
-                      'relative grid size-5 shrink-0 cursor-grab touch-none select-none place-items-center rounded-[3px] text-[0.5625rem] font-semibold uppercase leading-none transition-opacity hover:opacity-100',
+                      'relative grid shrink-0 cursor-grab touch-none select-none place-items-center rounded-[3px] text-[0.5625rem] font-semibold uppercase leading-none transition-opacity hover:opacity-100',
+                      tile.sizeClass,
                       active ? 'opacity-100' : 'opacity-55',
                       isDragging && 'z-10 cursor-grabbing opacity-100'
                     )}
+                    data-slot="profile-rail-square"
                     ref={setNodeRef}
                     style={{
                       backgroundColor: profileColorSoft(hue, active ? 30 : 22),
@@ -1568,7 +1587,7 @@ function ProfileSquare({
                     onPointerMove={notePointerMove}
                     onPointerUp={clearPress}
                   >
-                    {profileShortLabel(label)}
+                    {tile.face(label)}
                     {/* The "remote" badge: a tiny globe pinned to the corner of an
                         overridden profile's square, so which profiles leave this
                         machine is visible at a glance (#91349). */}

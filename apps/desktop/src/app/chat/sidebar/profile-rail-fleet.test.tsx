@@ -490,6 +490,35 @@ describe('ProfileRail fleet mode', () => {
     expect(screen.queryByRole('button', { name: 'Manage gateways…' })).toBeNull()
   })
 
+  it('shows two-letter tiles on both the active and at-rest squares when the pref is on', async () => {
+    const { $profileTwoLetterTiles } = await import('@/store/profile-rail-prefs')
+
+    armFleet()
+    profiles.set([
+      { is_default: true, name: 'default' },
+      { is_default: false, name: 'scout' }
+    ])
+
+    try {
+      const face = (container: HTMLElement, slot: string) =>
+        Array.from(container.querySelectorAll(`[data-slot="${slot}"]`)).map(el => el.textContent)
+
+      let container = await renderFleet()
+
+      expect(face(container, 'profile-rail-square')).toEqual(['s'])
+      expect(face(container, 'profile-rail-rest-square')).toEqual(['b'])
+      cleanup()
+
+      $profileTwoLetterTiles.set(true)
+      container = await renderFleet()
+
+      expect(face(container, 'profile-rail-square')).toEqual(['sc'])
+      expect(face(container, 'profile-rail-rest-square')).toEqual(['bu'])
+    } finally {
+      $profileTwoLetterTiles.set(false)
+    }
+  })
+
   it('marks an unreachable gateway but never hides it', async () => {
     armFleet()
     const container = await renderFleet()

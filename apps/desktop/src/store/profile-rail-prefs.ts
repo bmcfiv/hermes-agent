@@ -16,3 +16,12 @@ export const $profileRailVisible = modeBound('profileRailVisible', $profileRailV
 export function toggleProfileRailVisible() {
   $profileRailVisible.set(!$profileRailVisible.get())
 }
+
+// Two-letter profile tiles: the initials of the first two words, else the first
+// two letters (`bluemile` -> `bl`), so profiles sharing a first letter read
+// apart at a glance. Off by default (one mark, the original look).
+export const $profileTwoLetterTiles = persistentAtom('hermes.desktop.profileTwoLetterTiles', false, Codecs.bool)
+
+export function toggleProfileTwoLetterTiles() {
+  $profileTwoLetterTiles.set(!$profileTwoLetterTiles.get())
+}
