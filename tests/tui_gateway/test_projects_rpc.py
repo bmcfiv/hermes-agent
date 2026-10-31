@@ -759,3 +759,25 @@ def test_projects_without_a_profile_stay_on_the_launch_home(monkeypatch, tmp_pat
     assert not (Path(os.environ["HERMES_HOME"]) / "projects.db").exists()
 
 
+
+
+def test_auto_projects_setting_lists_only_user_created_projects(monkeypatch, tmp_path):
+    """``desktop.auto_projects: false`` keeps inferred folders out of the project tree; their
+    sessions land in Home. The default keeps them as auto projects."""
+    workspace = tmp_path / "inferred-workspace"
+    workspace.mkdir()
+    server._get_db().create_session("inferred-1", "cli", cwd=str(workspace))
+    server._get_db().append_message("inferred-1", "user", "hello")
+
+    def labels():
+        tree = _call("projects.tree")
+        return {p["label"]: p for p in tree["projects"]}
+
+    monkeypatch.setattr(server, "_load_cfg", lambda: {"desktop": {}})
+    default = labels()
+    assert default["inferred-workspace"]["isAuto"] is True
+
+    monkeypatch.setattr(server, "_load_cfg", lambda: {"desktop": {"auto_projects": False}})
+    off = labels()
+    assert "inferred-workspace" not in off
+    assert off["Home"]["sessionCount"] >= 1

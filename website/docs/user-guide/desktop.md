@@ -232,6 +232,8 @@ desktop:
 - Set `repo_scan_roots` to a list of folders to restrict scanning. An empty list preserves the default home-directory scan.
 - Set `repo_scan_exclude_paths` to folders whose complete subtrees should be skipped.
 
+- Set `desktop.auto_projects: false` to list only projects you created. Folders Hermes would otherwise infer from session working directories stop appearing as projects, and their sessions are listed under **Home**. The default (`true`) keeps the inferred projects.
+
 Changing any of these values invalidates only that profile's disk-discovery cache and starts a policy-compliant refresh. **Hide from sidebar** remains a separate per-item curation action.
 
 With **Group by → Projects**, each project row previews its three most recent sessions. A project with more ends in a **Show all N sessions** row that expands the rest in place; the sidebar menu's **Show all sessions** toggle removes the preview cap for every project at once.

@@ -16,3 +16,8 @@ def test_desktop_repo_discovery_keys_are_in_generated_schema():
     assert CONFIG_SCHEMA["desktop.repo_scan_enabled"]["type"] == "boolean"
     assert CONFIG_SCHEMA["desktop.repo_scan_roots"]["type"] == "list"
     assert CONFIG_SCHEMA["desktop.repo_scan_exclude_paths"]["type"] == "list"
+
+
+def test_desktop_auto_projects_defaults_on_and_is_in_schema():
+    assert DEFAULT_CONFIG["desktop"]["auto_projects"] is True
+    assert CONFIG_SCHEMA["desktop.auto_projects"]["type"] == "boolean"

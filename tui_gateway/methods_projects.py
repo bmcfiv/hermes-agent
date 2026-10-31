@@ -187,6 +187,13 @@ def _repo_discovery_policy(raw: dict | None = None) -> dict:
         "exclude_paths": _paths("exclude_paths", "repo_scan_exclude_paths")}
 
 
+def _auto_projects_enabled() -> bool:
+    """``desktop.auto_projects`` (default True). False lists only projects the user created."""
+    desktop = _load_cfg().get("desktop")
+    value = desktop.get("auto_projects", True) if isinstance(desktop, dict) else True
+    return value if isinstance(value, bool) else True
+
+
 def _repo_discovery_policy_key(policy: dict) -> str:
     def _paths(values: list[str]) -> list[str]:
         home = os.path.expanduser("~")
@@ -393,9 +400,11 @@ def _build_project_tree(
     git_probe.warm_roots(
         [str(f.get("path") or "") for p in projects for f in (p.get("folders") or [])]
         + [str(r.get("root") or "") for r in discovered])
+    auto = _auto_projects_enabled()
     tree = project_tree.build_tree(
-        projects, sessions, discovered, git_probe.resolve, preview_limit=preview_limit,
-        hydrate=hydrate, is_junk_root=_is_repo_junk, is_junk_cwd=_is_session_cwd_junk,
+        projects, sessions, discovered if auto else [], git_probe.resolve, preview_limit=preview_limit,
+        hydrate=hydrate, is_junk_root=_is_repo_junk if auto else (lambda _root: True),
+        is_junk_cwd=_is_session_cwd_junk if auto else (lambda _cwd: True),
         exists=_dir_exists_cached)
     return tree, active_id
 
