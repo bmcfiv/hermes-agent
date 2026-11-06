@@ -485,6 +485,47 @@ describe('watchSessionPins remote pull', () => {
     await flush()
   })
 
+  it('stops re-sending a pin the backend permanently refuses, and keeps the local pin', async () => {
+    patch.mockImplementation(() => Promise.reject(new Error('403: {"detail":"permission_denied"}')))
+
+    try {
+      $sessions.set([row('locked', { pinned: false })])
+      $pinnedSessionIds.set(['locked'])
+      await flush()
+      await flush()
+      expect(patch).toHaveBeenCalledTimes(1)
+
+      // Every later slice change used to re-queue the pin and PATCH it again.
+      $sessions.set([row('locked', { pinned: false }), row('other')])
+      await flush()
+      $sessions.set([row('locked', { pinned: false }), row('other'), row('third')])
+      await flush()
+      await flush()
+
+      expect(patch).toHaveBeenCalledTimes(1)
+      // The server can never show it pinned; that is not a remote unpin.
+      expect($pinnedSessionIds.get()).toContain('locked')
+    } finally {
+      patch.mockReset()
+      patch.mockImplementation(() => Promise.resolve({ ok: true }))
+    }
+  })
+
+  it('keeps retrying a pin refused only because the app is out of date', async () => {
+    patch.mockImplementationOnce(() => Promise.reject(new Error('409: {"detail":"client_upgrade_required"}')))
+
+    $sessions.set([row('stale')])
+    $pinnedSessionIds.set(['stale'])
+    await flush()
+    await flush()
+    patch.mockClear()
+
+    $sessions.set([row('stale', { pinned: false }), row('other')])
+    await flush()
+
+    expect(patch).toHaveBeenCalledWith('stale', true, undefined)
+  })
+
   it('keeps the pin and retries when the write itself fails', async () => {
     patch.mockImplementationOnce(() => Promise.reject(new Error('offline')))
 

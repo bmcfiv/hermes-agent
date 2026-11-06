@@ -47,6 +47,11 @@ import type { SessionInfo } from '@/types/hermes'
 const mirrored = new Set<string>()
 // pin ids awaiting their row so we can resolve the owning profile before PATCH.
 const pending = new Set<string>()
+// pin ids whose PATCH pinned=true the backend refused for good (permission_denied,
+// not_found, ...). Re-sending cannot succeed, so the pin stays local and out of
+// `pending`: otherwise it is re-queued on every slice change and the same 403 is
+// repeated for as long as the sidebar refreshes.
+const refused = new Set<string>()
 // Writes we've issued, id -> the value we wrote and when. A list page already
 // in flight when we PATCH still carries the OLD value, and it can land after
 // our ack — so the ack is not proof the page we're reading is newer than the
@@ -87,6 +92,10 @@ export const $unconfirmedPinWrites = atom<ReadonlySet<string>>(new Set())
 // enough to cover a list request issued just before the PATCH (those are the
 // slow ones), short enough that a genuine server-side change still wins.
 const WRITE_GUARD_MS = 10_000
+
+// Rejections meaning "this backend will never take a pin for this row". A stale
+// client (`upgrade`) is deliberately absent: that heals when the app is updated.
+const PERMANENT_PIN_REFUSAL = /not_found|permission_denied|session_superseded|profile_mismatch|\b404\b/i
 
 function publishUnconfirmed(): void {
   const published = $unconfirmedPinWrites.get()
@@ -304,6 +313,12 @@ function pullRemotePins(): void {
       continue
     }
 
+    // A pin the backend permanently refused never shows as pinned in a page;
+    // that is not a remote unpin, so keep the user's local pin.
+    if (!row.pinned && (refused.has(pinId) || refused.has(row.id))) {
+      continue
+    }
+
     if (row.pinned && !heldLocally) {
       // Mark mirrored first: pinSession fires the pin listener synchronously,
       // and the nested reconcile must not see this as a new pin to PATCH.
@@ -364,6 +379,7 @@ function reconcileInner(): void {
     if (!current.has(id)) {
       mirrored.delete(id)
       pending.delete(id)
+      refused.delete(id)
 
       // Removal owns the durable write; a separate unpin would race its
       // revision snapshot. Archive clears the pin in the same PATCH.
@@ -391,7 +407,14 @@ function reconcileInner(): void {
 
     pending.delete(id)
     mirrored.add(id)
-    void writePin(id, true, row.profile).catch(() => {
+    void writePin(id, true, row.profile).catch((err: unknown) => {
+      if (PERMANENT_PIN_REFUSAL.test(String(err))) {
+        // Retrying cannot succeed; stop here (still counted as mirrored).
+        refused.add(id)
+
+        return
+      }
+
       // Let a later reconcile retry the mirror.
       mirrored.delete(id)
       pending.add(id)
@@ -428,6 +451,7 @@ export function watchSessionPins(): void {
 export function resetSessionPinMirror(): void {
   mirrored.clear()
   pending.clear()
+  refused.clear()
   unconfirmed.clear()
   publishUnconfirmed()
 }
@@ -441,5 +465,6 @@ export function resetSessionPinMirror(): void {
 export function forgetPinSyncState(id: string): void {
   mirrored.delete(id)
   pending.delete(id)
+  refused.delete(id)
   unconfirmed.delete(id)
 }
