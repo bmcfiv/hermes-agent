@@ -77,7 +77,7 @@ import { openPetGenerate } from '@/store/pet-generate'
 import { toggleBrowserTab } from '@/store/preview'
 import { $projectTree, goToProject, openFolderAsProject, requestStartWorkSession } from '@/store/projects'
 import { $cronSessions, $messagingSessions, $sessions } from '@/store/session'
-import { $unconfirmedPinWrites } from '@/store/session-pin-sync'
+import { $unconfirmedPinWrites, ownedByPinScope } from '@/store/session-pin-sync'
 import { $removedSessionIds } from '@/store/session-removal'
 import { runGatewayRestart } from '@/store/system-actions'
 import {
@@ -680,7 +680,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   const pinnedSessions = useMemo(() => {
     const byAnyId = buildSessionByAnyId(liveRows, [], [])
 
-    return resolvePinnedSessions(pinnedSessionIds, byAnyId, liveRows, unconfirmedPinWrites).map(toSessionEntry)
+    return resolvePinnedSessions(pinnedSessionIds, byAnyId, liveRows.filter(ownedByPinScope), unconfirmedPinWrites).map(toSessionEntry)
   }, [liveRows, pinnedSessionIds, unconfirmedPinWrites])
 
   const sessions = useMemo(() => {

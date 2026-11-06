@@ -17,7 +17,13 @@ import { $pinnedSessionIds } from '@/store/layout'
 import { $activeGatewayProfile } from '@/store/profile'
 import { $cronSessions, $messagingSessions, $sessions, applySessionTitle, touchSessionActivity } from '@/store/session'
 
-import { $unconfirmedPinWrites, forgetPinSyncState, resetSessionPinMirror, watchSessionPins } from './session-pin-sync'
+import {
+  $unconfirmedPinWrites,
+  forgetPinSyncState,
+  ownedByPinScope,
+  resetSessionPinMirror,
+  watchSessionPins
+} from './session-pin-sync'
 
 const row = (id: string, extra: Partial<SessionInfo> = {}): SessionInfo =>
   ({ id, message_count: 1, source: 'cli', started_at: 0, title: id, ...extra }) as SessionInfo
@@ -564,5 +570,16 @@ describe('watchSessionPins remote pull', () => {
     // The active profile's row is authoritative, so the pin is dropped.
     expect($pinnedSessionIds.get()).toEqual([])
     $activeGatewayProfile.set('default')
+  })
+})
+
+describe('ownedByPinScope', () => {
+  it('keeps the active gateway rows and drops another gateway\'s pinned row', () => {
+    // A gateway pick leaves the previous gateway's rows painted. The Pinned
+    // section's server-flag fallback must not adopt them (the hub's pinned chat
+    // showed under Studio and Personal).
+    expect(ownedByPinScope(row('mine', { pinned: true }))).toBe(true)
+    expect(ownedByPinScope(row('theirs', { connection_id: 'work-mini', pinned: true }))).toBe(false)
+    expect(ownedByPinScope(row('theirs-too', { connection_id: 'mini', pinned: true }))).toBe(false)
   })
 })

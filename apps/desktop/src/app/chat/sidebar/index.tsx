@@ -130,7 +130,7 @@ import {
 } from '@/store/session'
 import { $sessionDotStateById, sessionStatusBucket } from '@/store/session-dot-state'
 import { $focusedSessionIsTile, $focusedStoredSessionId } from '@/store/session-focus'
-import { $unconfirmedPinWrites } from '@/store/session-pin-sync'
+import { $unconfirmedPinWrites, ownedByPinScope } from '@/store/session-pin-sync'
 import { $removedSessionIds } from '@/store/session-removal'
 import { $workingSessionIds } from '@/store/session-states'
 import { ackAllSessionsRead } from '@/store/session-unread'
@@ -699,10 +699,23 @@ export function ChatSidebar({
       resolvePinnedSessions(
         pinnedSessionIds,
         sessionByAnyId,
-        [...visibleSessions, ...cronSessions, ...messagingSessions],
+        // Server-flagged fallback: only rows the pin set's own gateway owns. A gateway pick leaves
+        // the previous gateway's rows painted and their `pinned` flag says nothing about this
+        // gateway; cron/messaging rows must also respect the selected profile.
+        [...visibleSessions, ...visibleCronSessions, ...visibleMessagingSessions].filter(ownedByPinScope),
         unconfirmedPinWrites
       ),
-    [pinnedSessionIds, sessionByAnyId, visibleSessions, cronSessions, messagingSessions, unconfirmedPinWrites]
+    // `ownedByPinScope` reads the active connection, so a gateway switch must re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      pinnedSessionIds,
+      sessionByAnyId,
+      visibleSessions,
+      visibleCronSessions,
+      visibleMessagingSessions,
+      unconfirmedPinWrites,
+      activeConnectionId
+    ]
   )
 
   // Every id a pin is reachable under: the raw stored ids, plus BOTH identities

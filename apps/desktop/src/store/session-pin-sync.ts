@@ -118,7 +118,7 @@ function profileFor(pinId: string): null | string | undefined {
  * back to the ambient owner id (the request scope's tag, or `local` for the
  * local pool).
  */
-function ownedByPinScope(row: SessionInfo): boolean {
+export function ownedByPinScope(row: SessionInfo): boolean {
   const primary = $primaryGatewayRoute.get()
   const owner = row.connection_id?.trim() || (primary.mode === 'local' ? 'local' : primary.connectionId?.trim())
 
