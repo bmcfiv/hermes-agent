@@ -70,6 +70,7 @@ import {
   closeCommandPalette,
   setCommandPaletteOpen
 } from '@/store/command-palette'
+import { $activeConnectionId } from '@/store/connections'
 import { completeFlow, recordAction } from '@/store/desktop-metrics'
 import { $bindings, bindingsFor } from '@/store/keybinds'
 import { $dismissedAutoProjectIds, $pinnedSessionIds, filterVisibleProjects } from '@/store/layout'
@@ -88,7 +89,7 @@ import { luminance } from '@/themes/color'
 import { type ThemeMode, useTheme } from '@/themes/context'
 import { isUserTheme, resolveTheme } from '@/themes/user-themes'
 
-import { buildSessionByAnyId, resolvePinnedSessions } from '../chat/sidebar/session-index'
+import { resolveOwnedPinnedSessions } from '../chat/sidebar/session-index'
 import { openSessionFromPicker, openSessionIntentFromModifiers } from '../open-session'
 import {
   AGENTS_ROUTE,
@@ -646,6 +647,7 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     staleTime: 0
   })
 
+  const activeConnectionId = useStore($activeConnectionId)
   const liveSessions = useStore($sessions)
   const liveCronSessions = useStore($cronSessions)
   const liveMessagingSessions = useStore($messagingSessions)
@@ -677,11 +679,19 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
 
   // Same resolution as the sidebar's Pinned section: local pin order first,
   // then server-flagged pins, minus our own in-flight unpins.
-  const pinnedSessions = useMemo(() => {
-    const byAnyId = buildSessionByAnyId(liveRows, [], [])
-
-    return resolvePinnedSessions(pinnedSessionIds, byAnyId, liveRows.filter(ownedByPinScope), unconfirmedPinWrites).map(toSessionEntry)
-  }, [liveRows, pinnedSessionIds, unconfirmedPinWrites])
+  const pinnedSessions = useMemo(
+    () =>
+      // Stored ids resolve only against the pin set's own gateway (see the sidebar).
+      resolveOwnedPinnedSessions(
+        pinnedSessionIds,
+        { cron: [], messaging: [], recents: liveRows },
+        ownedByPinScope,
+        unconfirmedPinWrites
+      ).map(toSessionEntry),
+    // `ownedByPinScope` reads the active connection, so a gateway switch must re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveRows, pinnedSessionIds, unconfirmedPinWrites, activeConnectionId]
+  )
 
   const sessions = useMemo(() => {
     const pinned = new Set(pinnedSessions.map(session => session.id))

@@ -95,3 +95,28 @@ export function resolvePinnedSessions(
 
   return out
 }
+
+/**
+ * The Pinned section for ONE gateway's pin set. Both the stored-id lookup and the
+ * server-flag fallback see only rows `isOwned` accepts: a gateway pick leaves the
+ * previous gateway's rows painted (the first gateway's live chats stay in the
+ * lists while another is in front), and its bare pin list would otherwise resolve
+ * its ids against them and paint those chats under the other gateway's Pinned.
+ */
+export function resolveOwnedPinnedSessions(
+  pinnedSessionIds: readonly string[],
+  slices: { cron: SessionInfo[]; messaging: SessionInfo[]; recents: SessionInfo[] },
+  isOwned: (row: SessionInfo) => boolean,
+  unconfirmedPinWrites: ReadonlySet<string>
+): SessionInfo[] {
+  const recents = slices.recents.filter(isOwned)
+  const cron = slices.cron.filter(isOwned)
+  const messaging = slices.messaging.filter(isOwned)
+
+  return resolvePinnedSessions(
+    pinnedSessionIds,
+    buildSessionByAnyId(recents, cron, messaging),
+    [...recents, ...cron, ...messaging],
+    unconfirmedPinWrites
+  )
+}

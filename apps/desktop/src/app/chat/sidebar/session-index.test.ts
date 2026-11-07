@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SessionInfo } from '@/types/hermes'
 
-import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
+import { buildSessionByAnyId, resolveOwnedPinnedSessions, resolvePinnedSessions } from './session-index'
 
 const row = (id: string, extra: Partial<SessionInfo> = {}): SessionInfo =>
   ({ id, message_count: 1, source: 'cli', started_at: 0, title: id, ...extra }) as SessionInfo
@@ -153,5 +153,46 @@ describe('resolvePinnedSessions', () => {
     const index = buildSessionByAnyId(sessions, [], [])
 
     expect(resolvePinnedSessions([], index, sessions, settled)).toEqual([])
+  })
+})
+
+describe('resolveOwnedPinnedSessions', () => {
+  const owns = (r: SessionInfo) => r.connection_id !== 'hub'
+
+  it("does not resolve a stored pin id against another gateway's lingering row", () => {
+    // Another gateway is in front: the first gateway's bare pin list still names its
+    // live chats, whose rows are still painted in the lists. They must not show here.
+    const hubLive = row('hub-live', { connection_id: 'hub', pinned: true })
+    const studio = row('studio-a', { pinned: true })
+
+    const out = resolveOwnedPinnedSessions(
+      ['hub-live', 'studio-a'],
+      { cron: [], messaging: [], recents: [hubLive, studio] },
+      owns,
+      settled
+    )
+
+    expect(out.map(r => r.id)).toEqual(['studio-a'])
+
+    // The old shape (fallback filtered, stored-id index not) paints the foreign chat.
+    const before = resolvePinnedSessions(
+      ['hub-live', 'studio-a'],
+      buildSessionByAnyId([hubLive, studio], [], []),
+      [studio],
+      settled
+    )
+
+    expect(before.map(r => r.id)).toContain('hub-live')
+  })
+
+  it('keeps stored-id order for owned rows and adopts owned server-flagged pins', () => {
+    const out = resolveOwnedPinnedSessions(
+      ['b', 'a'],
+      { cron: [], messaging: [row('c', { pinned: true })], recents: [row('a'), row('b')] },
+      owns,
+      settled
+    )
+
+    expect(out.map(r => r.id)).toEqual(['b', 'a', 'c'])
   })
 })

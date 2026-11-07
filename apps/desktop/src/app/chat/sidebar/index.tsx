@@ -190,7 +190,7 @@ import {
   SidebarSessionSkeletons,
   SidebarStorageCorruptNotice
 } from './section-states'
-import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
+import { buildSessionByAnyId, resolveOwnedPinnedSessions } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
 import { useEnteredProjectSessions } from './use-entered-project-sessions'
@@ -696,20 +696,16 @@ export function ChatSidebar({
   // minus the rows whose flag our own in-flight pin write already contradicts.
   const pinnedSessions = useMemo(
     () =>
-      resolvePinnedSessions(
+      resolveOwnedPinnedSessions(
         pinnedSessionIds,
-        sessionByAnyId,
-        // Server-flagged fallback: only rows the pin set's own gateway owns. A gateway pick leaves
-        // the previous gateway's rows painted and their `pinned` flag says nothing about this
-        // gateway; cron/messaging rows must also respect the selected profile.
-        [...visibleSessions, ...visibleCronSessions, ...visibleMessagingSessions].filter(ownedByPinScope),
+        { cron: visibleCronSessions, messaging: visibleMessagingSessions, recents: visibleSessions },
+        ownedByPinScope,
         unconfirmedPinWrites
       ),
     // `ownedByPinScope` reads the active connection, so a gateway switch must re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       pinnedSessionIds,
-      sessionByAnyId,
       visibleSessions,
       visibleCronSessions,
       visibleMessagingSessions,
