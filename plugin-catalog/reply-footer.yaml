@@ -1,0 +1,21 @@
+name: reply-footer
+repo: https://github.com/bmcfiv/hermes-reply-footer
+sha: "f4033915ee6cbf15ddb0470b2f4240e958f588d4"
+version: "1.0.0"
+title: Reply Footer
+description: "Keeps a standing reply-format rule from fading in long sessions. Once you set a reminder, the plugin adds it to the context of every interactive user turn, and can check long replies against a regex and log OK/MISS lines. Does nothing until a reminder is configured. Disclosure — no network, credentials or subprocesses; the only file written is logs/reply_footer.log under the active Hermes home, and only when the log setting is on."
+maintainer: bmcfiv
+tier: community
+category: general
+requires_hermes: ">=0.21"
+docs_url: https://github.com/bmcfiv/hermes-reply-footer#readme
+readme: true
+platforms: []
+capabilities:
+  provides_tools: []
+  provides_hooks: [pre_llm_call, post_llm_call]
+  provides_middleware: []
+  requires_env: []
+known_issues:
+  - "Hermes loads plugins at process start: a long-running messaging gateway admits finite (hermes chat -Q) sessions with the plugin set it started with, so a newly installed or enabled plugin reaches them only after the gateway restarts."
+  - "The reminder is added to every interactive user turn and counts against the context; keep it short. Cron, subagent, batch and webhook sources are skipped by default (skip_sources)."
