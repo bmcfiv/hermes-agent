@@ -853,6 +853,24 @@ def test_resume_refusal_names_the_clashing_flag_and_the_way_forward(store):
                             {"info": {"launch_request": {"provider": "openrouter"}}})
 
 
+def test_resume_judges_an_explicit_source_against_the_frozen_launch(store, monkeypatch):
+    """`hermes chat --resume <id> --source desktop -Q` on a session a finite run created: the session
+    keeps its creation label (``oneshot``), so the typed --source is refused as the thin client
+    refuses it, never silently dropped. Repeating the creation source, or a label only inherited
+    from a parent Desktop/TUI session (not typed), resumes as before."""
+    db, client = store
+    _frozen_launch(client, {"source": "oneshot"})
+    host = cli("local-old", resumed=True)
+    monkeypatch.setenv("HERMES_SESSION_SOURCE", "desktop")
+    monkeypatch.delenv("HERMES_SESSION_SOURCE_EXPLICIT", raising=False)
+    assert GatewaySessionStore(db.connection).open_session(host, {}) == "local-old"
+    monkeypatch.setenv("HERMES_SESSION_SOURCE_EXPLICIT", "1")
+    with pytest.raises(GatewayClientError, match="--source differs"):
+        GatewaySessionStore(db.connection).open_session(host, {})
+    monkeypatch.setenv("HERMES_SESSION_SOURCE", "oneshot")
+    assert GatewaySessionStore(db.connection).open_session(host, {}) == "local-old"
+
+
 def test_clear_banner_shows_the_new_gateway_sessions_tools_and_short_label(store, monkeypatch):
     """#134889 CLI-22: `/clear` inside the running CLI redraws the banner from the new gateway
     session's snapshot (its MCP tools, main's 8-character label), as the startup banner does; this

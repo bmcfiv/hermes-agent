@@ -520,11 +520,14 @@ _RESUME_CHECKED = _LAUNCH_POLICY
 def _check_resume_launch(launch, snapshot):
     """Explicit launch flags on ``--resume`` / ``-c`` against the session's frozen route, as the thin
     client checks them: the same flags again are fine, a different value is refused, never dropped."""
+    from agent.session_source import explicit_session_source
     from hermes_cli.gateway_chat import check_resume_policy, resume_policy_error
     fields = {key: launch.get(key) for key in _RESUME_CHECKED}
     if isinstance(fields.get("toolsets"), (list, tuple)):
         fields["toolsets"] = ",".join(str(item) for item in fields["toolsets"])
-    check_resume_policy(argparse.Namespace(**fields), snapshot)
+    # A typed --source reaches this process only as env (main.py); the session keeps its creation
+    # label, so a different one is refused here as the thin client refuses it, not silently dropped.
+    check_resume_policy(argparse.Namespace(**fields, source=explicit_session_source()), snapshot)
     frozen = ((snapshot.get("info") or {}).get("launch_request") or {})
     differs = [key for key, value in _classic_only_policy(launch).items() if frozen.get(key) != value]
     if differs:

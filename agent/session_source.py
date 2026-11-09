@@ -36,6 +36,14 @@ def create_surface(source: str) -> str:
     return "gui" if source == "desktop" else source
 
 
+def explicit_session_source() -> Optional[str]:
+    """The label this process was launched with by a typed ``--source``; None when the label is only
+    inherited from a parent session (the terminal tool bridges HERMES_SESSION_SOURCE) or unset."""
+    if get_session_env("HERMES_SESSION_SOURCE_EXPLICIT", "") != "1":
+        return None
+    return str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip() or None
+
+
 def session_source_for(platform: Optional[str]) -> str:
     source = str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip()
     single_query = get_session_env("HERMES_SINGLE_QUERY_SESSION", "") == "1"
