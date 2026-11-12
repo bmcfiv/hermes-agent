@@ -259,7 +259,21 @@ def _resolve_create_cwd(params: dict, source: str, profile_home) -> tuple[bool, 
             session_cwd = raw_cwd
         elif session_cwd and session_cwd == os.path.abspath(os.path.expanduser(raw_cwd)):
             explicit_cwd = True
-    return explicit_cwd, session_cwd, remote_cwd
+    resolved = (explicit_cwd, session_cwd, remote_cwd)
+    home_cwd = _single_project_home_cwd(params, source, profile_home, resolved)
+    return (True, home_cwd, False) if home_cwd else resolved
+
+
+def _single_project_home_cwd(params: dict, source: str, profile_home, resolved: tuple) -> str | None:
+    """Opt-in ``desktop.single_project_home``: the folder a bare desktop chat starts in when the
+    session's OWN profile has exactly one project (``project_home``); None keeps ``resolved``."""
+    from tui_gateway import project_home
+    home = Path(profile_home) if profile_home else Path(_hermes_home)
+    try:
+        return project_home.profile_create_cwd(params, source, resolved, home)
+    except (Exception, ConfigBackendUnavailable):  # health: allow BLE001 -- a hint; never fail the create
+        logger.warning("single_project_home: %s unreadable; stock cwd", home, exc_info=True)
+        return None
 
 
 def _persisted_session_cwd(session: dict) -> str | None:

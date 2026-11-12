@@ -109,3 +109,101 @@ def test_desktop_launch_fallback_cwd_still_persists_nothing(monkeypatch, tmp_pat
         if sid:
             server._sessions.pop(sid, None)
         db.close()
+
+
+# --- opt-in desktop.single_project_home -------------------------------------------------------
+
+
+def _profile_home_with_projects(tmp_path, *, flag, folders):
+    """A profile home whose config sets ``desktop.single_project_home`` (None = unset) and whose
+    projects.db holds one project per folder."""
+    from hermes_cli import projects_db as pdb
+
+    home = tmp_path / "profile-home"
+    home.mkdir()
+    if flag is not None:
+        (home / "config.yaml").write_text(f"desktop:\n  single_project_home: {str(flag).lower()}\n")
+    with pdb.connect_closing(home / "projects.db") as conn:
+        for i, folder in enumerate(folders):
+            folder.mkdir(parents=True, exist_ok=True)
+            pdb.create_project(conn, name=f"Project {i}", folders=[str(folder)])
+    return home
+
+
+def _bare_desktop_create(monkeypatch, tmp_path, home, params=None):
+    """Create a session on the launch profile served from ``home``; return (cwd, explicit, row cwd)."""
+    db = _gateway_with_db(monkeypatch, tmp_path)
+    monkeypatch.setattr(server, "_hermes_home", home)
+    launch_dir = tmp_path / "gateway-launch-dir"
+    launch_dir.mkdir(exist_ok=True)
+    monkeypatch.chdir(launch_dir)
+    monkeypatch.delenv("TERMINAL_CWD", raising=False)
+    monkeypatch.setattr(server, "_launch_configured_cwd", lambda: None)
+    sid = None
+    try:
+        response = server.handle_request(
+            {"id": "create", "method": "session.create", "params": {"source": "desktop", **(params or {})}})
+        assert "result" in response, response
+        sid, stored_id = response["result"]["session_id"], response["result"]["stored_session_id"]
+        session = server._sessions[sid]
+        assert server._persist_session_row_for_submit("rid", session) is None
+        return session["cwd"], session["explicit_cwd"], db.get_session(stored_id)["cwd"]
+    finally:
+        if sid:
+            server._sessions.pop(sid, None)
+        db.close()
+
+
+def test_single_project_home_off_keeps_the_bare_desktop_chat_in_home(monkeypatch, tmp_path):
+    for flag in (None, False):
+        sub = tmp_path / f"flag-{flag}"
+        sub.mkdir()
+        home = _profile_home_with_projects(sub, flag=flag, folders=[sub / "proj"])
+        _cwd, explicit, row_cwd = _bare_desktop_create(monkeypatch, sub, home)
+        assert explicit is False
+        assert row_cwd is None
+
+
+def test_single_project_home_starts_a_bare_desktop_chat_in_the_only_project(monkeypatch, tmp_path):
+    project = tmp_path / "proj"
+    home = _profile_home_with_projects(tmp_path, flag=True, folders=[project])
+
+    cwd, explicit, row_cwd = _bare_desktop_create(monkeypatch, tmp_path, home)
+
+    assert explicit is True
+    assert cwd == row_cwd == str(project)
+
+
+def test_single_project_home_with_two_projects_is_stock(monkeypatch, tmp_path):
+    home = _profile_home_with_projects(tmp_path, flag=True, folders=[tmp_path / "a", tmp_path / "b"])
+
+    _cwd, explicit, row_cwd = _bare_desktop_create(monkeypatch, tmp_path, home)
+
+    assert explicit is False
+    assert row_cwd is None
+
+
+def test_single_project_home_never_moves_a_deliberate_pick(monkeypatch, tmp_path):
+    home = _profile_home_with_projects(tmp_path, flag=True, folders=[tmp_path / "proj"])
+    picked = tmp_path / "picked"
+    picked.mkdir()
+
+    cwd, explicit, row_cwd = _bare_desktop_create(
+        monkeypatch, tmp_path, home, {"cwd": str(picked), "cwd_explicit": True})
+
+    assert explicit is True
+    assert cwd == row_cwd == str(picked)
+
+
+def test_single_project_home_only_applies_to_desktop_chats(monkeypatch, tmp_path):
+    """The resolver itself: cli / api_server sources and branches keep the stock resolution."""
+    home = _profile_home_with_projects(tmp_path, flag=True, folders=[tmp_path / "proj"])
+    monkeypatch.setattr(server, "_hermes_home", home)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("TERMINAL_CWD", raising=False)
+    monkeypatch.setattr(server, "_launch_configured_cwd", lambda: None)
+
+    assert server._resolve_create_cwd({}, "desktop", None)[:2] == (True, str(tmp_path / "proj"))
+    for source in ("cli", "api_server", "tui"):
+        assert server._resolve_create_cwd({}, source, None)[0] is False
+    assert server._resolve_create_cwd({"parent_session_id": "s1"}, "desktop", None)[0] is False

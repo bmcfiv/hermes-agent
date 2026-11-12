@@ -759,3 +759,67 @@ def test_projects_without_a_profile_stay_on_the_launch_home(monkeypatch, tmp_pat
     assert not (Path(os.environ["HERMES_HOME"]) / "projects.db").exists()
 
 
+
+
+def _create_cwdless_session(home: Path, session_id: str) -> None:
+    """Seed one message-bearing session with no cwd (a Home row) in ``home``'s state.db."""
+    from hermes_state import SessionDB
+
+    db = SessionDB(db_path=home / "state.db")
+    try:
+        db.create_session(session_id, "desktop")
+        db.append_message(session_id, "user", f"hello from {session_id}")
+    finally:
+        db.close()
+
+
+def _tree_ids(tree: dict) -> list[str]:
+    return [p["id"] for p in tree["projects"]]
+
+
+def test_single_project_home_is_read_from_each_profiles_own_config(monkeypatch, tmp_path):
+    """``desktop.single_project_home`` set only in the coder profile folds coder's Home rows into
+    its one project (tree AND new desktop chat cwd); the launch profile stays stock."""
+    launch_home = _profile_dir(tmp_path, "launch")
+    coder_home = _profile_dir(tmp_path, "coder")
+    launch_repo = tmp_path / "repos" / "sph-launch"
+    coder_repo = tmp_path / "repos" / "sph-coder"
+    launch_repo.mkdir(parents=True)
+    coder_repo.mkdir(parents=True)
+    (coder_home / "config.yaml").write_text("desktop:\n  single_project_home: true\n")
+    _bind_profiles(monkeypatch, tmp_path, {"default": launch_home, "coder": coder_home})
+
+    _create_project(launch_home, "Launch", launch_repo)
+    coder_project = _create_project(coder_home, "Coder", coder_repo)
+    _create_cwdless_session(launch_home, "launch-home-row")
+    _create_cwdless_session(coder_home, "coder-home-row")
+
+    with _serving_launch_profile(launch_home):
+        launch_tree = _call("projects.tree")
+        coder_tree = _call("projects.tree", {"profile": "coder"})
+        launch_cwd = server._resolve_create_cwd({}, "desktop", None)
+        coder_cwd = server._resolve_create_cwd({}, "desktop", coder_home)
+
+    assert _tree_ids(launch_tree)[0] == "__no_project__"
+    assert _tree_ids(coder_tree) == [coder_project["id"]]
+    assert coder_tree["projects"][0]["sessionIds"] == ["coder-home-row"]
+    assert coder_tree["scoped_session_ids"] == ["coder-home-row"]
+    assert launch_cwd[0] is False
+    assert coder_cwd[:2] == (True, str(coder_repo))
+
+
+def test_single_project_home_with_two_projects_keeps_the_home_bucket(monkeypatch, tmp_path):
+    launch_home = _profile_dir(tmp_path, "launch")
+    (launch_home / "config.yaml").write_text("desktop:\n  single_project_home: true\n")
+    _bind_profiles(monkeypatch, tmp_path, {"default": launch_home})
+    for name in ("one", "two"):
+        repo = tmp_path / "repos" / f"sph-{name}"
+        repo.mkdir(parents=True)
+        _create_project(launch_home, name, repo)
+    _create_cwdless_session(launch_home, "home-row")
+
+    with _serving_launch_profile(launch_home):
+        tree = _call("projects.tree")
+
+    assert _tree_ids(tree)[0] == "__no_project__"
+    assert tree["projects"][0]["sessionIds"] == ["home-row"]

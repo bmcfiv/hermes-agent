@@ -737,3 +737,37 @@ def test_cwdless_session_with_repo_root_stays_in_its_explicit_project():
     assert owned["id"] in explicit["sessionIds"]
     assert owned["id"] in [s["id"] for s in _sessions_of(explicit)]
     assert _home_session_ids(tree) == [detached["id"]]
+
+
+def test_home_project_id_files_home_rows_under_that_project():
+    """``desktop.single_project_home``: the named project takes every row Home would hold (in
+    its main lane), no Home bucket is emitted, and the session set is unchanged."""
+    project = _project("p_app", "App", ["/www/app"])
+    owned = _session("/www/app", branch="main")
+    detached = _session(None)
+    elsewhere = _session("/www/other")  # an auto project stays an auto project
+
+    tree = pt.build_tree(
+        [project], [owned, detached, elsewhere], [], resolve=lambda _cwd: None, hydrate=True,
+        home_project_id="p_app")
+
+    assert _home(tree) is None
+    node = next(p for p in tree["projects"] if p["id"] == "p_app")
+    assert sorted(node["sessionIds"]) == sorted([owned["id"], detached["id"]])
+    assert node["sessionCount"] == 2
+    assert {s["id"] for s in _sessions_of(node)} == {owned["id"], detached["id"]}
+    assert "/www/other" in _real_project_ids(tree)
+    assert sorted(tree["scoped_session_ids"]) == sorted([owned["id"], detached["id"], elsewhere["id"]])
+    assert detached["cwd"] is None  # the caller's rows are not mutated
+
+
+def test_home_project_id_unset_or_unknown_keeps_the_home_bucket():
+    project = _project("p_app", "App", ["/www/app"])
+    detached = _session(None)
+
+    for home_project_id in (None, "p_gone"):
+        tree = pt.build_tree(
+            [project], [detached], [], resolve=lambda _cwd: None, hydrate=True,
+            home_project_id=home_project_id)
+        assert tree["projects"][0]["id"] == pt.NO_PROJECT_ID
+        assert _home_session_ids(tree) == [detached["id"]]

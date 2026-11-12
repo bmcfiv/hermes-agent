@@ -410,17 +410,38 @@ def _home_project(homeless: list[dict], hydrate: bool, previews: list[dict]) -> 
         previews, homeless, isNoProject=True)
 
 
+def _explicit_project(
+        project: dict, psessions: list[dict], resolve: Optional[Resolve], hydrate: bool,
+        previews: list[dict]) -> dict:
+    """A user-created project's node (always shown, even with 0 sessions)."""
+    repos = _build_repos(psessions, resolve, hydrate)
+    repos = _seed_folder_repos(repos, project.get("folders") or [], resolve)
+    return _project_node(
+        project["id"], project.get("name") or project["id"], project.get("primary_path"), repos,
+        len(psessions), _last_active(psessions), previews, psessions,
+        color=project.get("color"), icon=project.get("icon"))
+
+
+def _home_in_project(homeless: list[dict], project: dict) -> list[dict]:
+    """Home rows re-anchored on ``project``'s primary folder (copies; the caller's rows are untouched),
+    so they place into its main lane like any session started there."""
+    return [dict(s, cwd=project["primary_path"], git_repo_root=None) for s in homeless]
+
+
 def build_tree(
     projects: list[dict], sessions: list[dict], discovered_repos: list[dict],
     resolve: Optional[Resolve] = None, *, preview_limit: int = 3, hydrate: bool = False,
     is_junk_root: Optional[Callable[[str], bool]] = None,
-    is_junk_cwd: Optional[Callable[[str], bool]] = None, exists: Optional[Exists] = None) -> dict:
+    is_junk_cwd: Optional[Callable[[str], bool]] = None, exists: Optional[Exists] = None,
+    home_project_id: Optional[str] = None) -> dict:
     """Build the authoritative project tree -> ``{"projects", "scoped_session_ids"}``.
 
     ``is_junk_root`` flags git roots that must never become an AUTO project; ``is_junk_cwd``
     is the narrower non-git policy (explicit projects are honored regardless); ``exists``
     keeps a DELETED workspace from becoming a phantom AUTO project (omit on remote backends).
     ``hydrate`` False empties lane ``sessions`` but keeps counts + ``previewSessions``.
+    ``home_project_id`` names an active project (with a ``primary_path``) that takes the rows
+    the Home bucket would hold, so no Home bucket is emitted (``desktop.single_project_home``).
     """
     active_projects = [p for p in projects if not p.get("archived")]
     _junk = is_junk_root or (lambda _root: False)
@@ -447,12 +468,7 @@ def build_tree(
     for project in active_projects:
         psessions = by_project.get(project["id"], [])
         _scope(psessions)
-        repos = _build_repos(psessions, resolve, hydrate)
-        repos = _seed_folder_repos(repos, project.get("folders") or [], resolve)
-        result.append(_project_node(
-            project["id"], project.get("name") or project["id"], project.get("primary_path"), repos,
-            len(psessions), _last_active(psessions), _previews(psessions), psessions,
-            color=project.get("color"), icon=project.get("icon")))
+        result.append(_explicit_project(project, psessions, resolve, hydrate, _previews(psessions)))
 
     # Tier 2: auto projects from leftover sessions.
     by_auto_root, homeless = _auto_buckets(unowned, resolve, _junk, _junk_cwd, _exists)
@@ -493,7 +509,15 @@ def build_tree(
     _disambiguate_labels([p for p in result if p.get("isAuto")])
 
     # Tier 0: whatever the tiers above could not place. Leads the list; omitted when empty.
-    if homeless:
+    home_index = next((i for i, p in enumerate(active_projects)
+                       if home_project_id and p["id"] == home_project_id and p.get("primary_path")), None)
+    if homeless and home_index is not None:
+        # The profile's home IS this project: its node is rebuilt with the Home rows (Tier 1 order).
+        home = active_projects[home_index]
+        _scope(homeless)
+        psessions = by_project.get(home["id"], []) + _home_in_project(homeless, home)
+        result[home_index] = _explicit_project(home, psessions, resolve, hydrate, _previews(psessions))
+    elif homeless:
         homeless.sort(key=_session_time, reverse=True)
         _scope(homeless)
         result.insert(0, _home_project(homeless, hydrate, _previews(homeless)))

@@ -276,6 +276,22 @@ desktop:
 
 Changing any of these values invalidates only that profile's disk-discovery cache and starts a policy-compliant refresh. **Hide from sidebar** remains a separate per-item curation action.
 
+#### One project as the profile's home
+
+Sessions no project claims sit in the sidebar's **Home** row, and a new chat with no folder picked has no workspace. If you keep one project per profile, you can make that project the profile's home instead:
+
+```yaml
+desktop:
+  single_project_home: true
+```
+
+While the profile has exactly **one** active (non-archived) project whose folder exists:
+
+- The Projects sidebar shows no separate **Home** row; those sessions are listed under the project.
+- A new desktop chat with no folder picked starts in the project's primary folder, so the project's `AGENTS.md` and project skills load and the chat is stored under the project. Picking a folder, branching a chat, SSH workspaces, and chats from the CLI, TUI, API server or messaging platforms are unaffected.
+
+With no project, or two or more, the setting has no effect. It is read from each profile's own `config.yaml`. Off by default.
+
 With **Group by → Projects**, each project row previews its three most recent sessions. A project with more ends in a **Show all N sessions** row that expands the rest in place; the sidebar menu's **Show all sessions** toggle removes the preview cap for every project at once.
 
 #### Choosing a model

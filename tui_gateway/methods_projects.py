@@ -396,8 +396,18 @@ def _build_project_tree(
     tree = project_tree.build_tree(
         projects, sessions, discovered, git_probe.resolve, preview_limit=preview_limit,
         hydrate=hydrate, is_junk_root=_is_repo_junk, is_junk_cwd=_is_session_cwd_junk,
-        exists=_dir_exists_cached)
+        exists=_dir_exists_cached, home_project_id=_single_project_home_id(projects))
     return tree, active_id
+
+
+def _single_project_home_id(projects: list[dict]) -> str | None:
+    """The project that takes the Home bucket's rows under opt-in ``desktop.single_project_home``
+    (read from the bound profile's config, like the repo-scan policy), else None (stock tree)."""
+    from tui_gateway import project_home
+    if not project_home.enabled(_load_cfg()):
+        return None
+    project = project_home.single_project(projects, exists=_dir_exists_cached)
+    return project["id"] if project else None
 
 
 def register(server) -> None:
