@@ -130,7 +130,7 @@ import {
 } from '@/store/session'
 import { $sessionDotStateById, sessionStatusBucket } from '@/store/session-dot-state'
 import { $focusedSessionIsTile, $focusedStoredSessionId } from '@/store/session-focus'
-import { $unconfirmedPinWrites } from '@/store/session-pin-sync'
+import { $unconfirmedPinWrites, ownedByWindowGateway } from '@/store/session-pin-sync'
 import { $removedSessionIds } from '@/store/session-removal'
 import { $workingSessionIds } from '@/store/session-states'
 import { ackAllSessionsRead } from '@/store/session-unread'
@@ -157,7 +157,7 @@ import { SidebarFilterMenu } from './filter-menu'
 import { buildGatewaySessionGroups, scopeGatewaySessionGroups, useGatewaySessionGroups } from './gateway-group-model'
 import { SidebarLoadMoreRow } from './load-more-row'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from './order'
-import { filterSessionsByProfileScope } from './profile-scope'
+import { filterSessionsByOwnerScope, filterSessionsByProfileScope } from './profile-scope'
 import { ProfileRail } from './profile-switcher'
 import { ProjectDialog } from './project-dialog'
 import { filterToSessionBearingProjects, resolveLiveProjectFilter } from './project-filter'
@@ -604,11 +604,20 @@ export function ChatSidebar({
   // Archived rows are excluded from the sessions query, so Archived is a view of
   // its own set rather than a filter over this one — a flat list of archived
   // rows, no project tree, no date or status dividers.
-  const scopedSessions = useMemo(() => {
-    const pool = showArchived ? archivedSessions : sessions
-
-    return filterSessionsByProfileScope(pool, profileScope)
-  }, [sessions, archivedSessions, showArchived, profileScope])
+  //
+  // The live pool is narrowed to the window's gateway as well as its profile: a
+  // pick between kept gateways leaves the previous gateway's working / open rows
+  // loaded (see filterSessionsByOwnerScope), and `default` on another machine is
+  // not this `default`. Archived is fetched for the window's gateway on demand.
+  const scopedSessions = useMemo(
+    () =>
+      showArchived
+        ? filterSessionsByProfileScope(archivedSessions, profileScope)
+        : filterSessionsByOwnerScope(sessions, profileScope, ownedByWindowGateway),
+    // `ownedByWindowGateway` reads the active connection, so a gateway switch must re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sessions, archivedSessions, showArchived, profileScope, activeConnectionId]
+  )
 
   // One predicate for the status/project filters, so the flat list and the
   // project lanes narrow by the same rule. A project lane holds rows the loaded
@@ -674,13 +683,17 @@ export function ChatSidebar({
   )
 
   const visibleCronSessions = useMemo(
-    () => filterSessionsByProfileScope(cronSessions, profileScope),
-    [cronSessions, profileScope]
+    () => filterSessionsByOwnerScope(cronSessions, profileScope, ownedByWindowGateway),
+    // `ownedByWindowGateway` reads the active connection, so a gateway switch must re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cronSessions, profileScope, activeConnectionId]
   )
 
   const visibleMessagingSessions = useMemo(
-    () => filterSessionsByProfileScope(messagingSessions, profileScope),
-    [messagingSessions, profileScope]
+    () => filterSessionsByOwnerScope(messagingSessions, profileScope, ownedByWindowGateway),
+    // `ownedByWindowGateway` reads the active connection, so a gateway switch must re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messagingSessions, profileScope, activeConnectionId]
   )
 
   // Index sessions by every id a pin might be stored under — recents, cron,

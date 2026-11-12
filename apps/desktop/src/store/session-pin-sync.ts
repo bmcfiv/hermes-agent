@@ -129,6 +129,20 @@ function ownedByPinScope(row: SessionInfo): boolean {
   return owner === ($connection.get()?.connectionId?.trim() || ambientOwnerConnectionId())
 }
 
+/**
+ * Whether the sidebar lists `row` under the window's gateway.
+ *
+ * Same ownership rule as the pin set, but it fails OPEN: when the window cannot
+ * name its own gateway (no connection descriptor and no ambient owner yet, as
+ * during boot), nothing is hidden. Hiding a real chat is worse than listing a
+ * neighbour's for a moment.
+ */
+export function ownedByWindowGateway(row: SessionInfo): boolean {
+  const windowOwner = $connection.get()?.connectionId?.trim() || ambientOwnerConnectionId()
+
+  return !windowOwner || ownedByPinScope(row)
+}
+
 function loadedSessionRows(): SessionInfo[] {
   return [...$sessions.get(), ...$cronSessions.get(), ...$messagingSessions.get()].filter(ownedByPinScope)
 }
