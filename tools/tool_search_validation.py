@@ -233,12 +233,44 @@ def session_unavailable_error(name: str, session_tool_names: Optional[Iterable[s
     return out_of_scope_reason(name) or unavailable_in_session_reason(name)
 
 
-def not_deferrable_error(name: str, session_tool_names: Optional[Iterable[str]] = None) -> str:
+def _registered_spelling(name: str) -> Optional[str]:
+    """The registry name behind a spelling the model can only have learned from the wire: an
+    Anthropic-OAuth ``mcp__`` prefix (``mcp__vision_analyze``) or a prose alias the system prompt
+    carries instead of the real name (``chat_history_lookup`` for ``session_search``). None when
+    ``name`` is already registered or no rewrite lands on a registered or core tool."""
+    from tools.tool_search import _core_tool_names  # late: tool_search imports this module
+    known = _core_tool_names()
+    if name in known or _registry_entry(name) is not None:
+        return None
+    try:
+        from agent.anthropic_adapter import _OAUTH_TOOL_NAME_REVERSE_ALIASES as reverse
+    except ImportError:  # an adapter import problem must never break an error message
+        reverse = {}
+    bare = name.removeprefix("mcp__")
+    for candidate in (reverse.get(bare), bare):
+        if candidate and candidate != name and (candidate in known or _registry_entry(candidate) is not None):
+            return candidate
+    return None
+
+
+def _call_text(head: str, arguments: Optional[dict]) -> str:
+    """One copyable call; arguments are the ones the model just sent, so nothing is invented."""
+    shown = json.dumps(arguments if isinstance(arguments, dict) else {}, ensure_ascii=False)
+    if len(shown) > 400:
+        shown = "{...same arguments...}"
+    return head.replace("{ARGS}", shown)
+
+
+def not_deferrable_error(name: str, session_tool_names: Optional[Iterable[str]] = None,
+                         arguments: Optional[dict] = None) -> str:
     """Rejection for a ``tool_call`` naming something that is not a deferred tool.
     Two different mistakes reach here and need opposite corrections: a directly-listed
     tool (call it without the bridge) vs. an unknown name — typically a deferred MCP tool
     cited by its bare suffix instead of the full ``mcp__<server>__{tool}`` name. Telling
     the second group 'call it directly' is the opposite of what they must do.
+
+    A third mistake is a wire spelling (``mcp__vision_analyze``, ``chat_history_lookup``): the
+    model was shown that name, so it is told the exact working call, with the arguments it sent.
 
     ``_HERMES_CORE_TOOLS`` is a *static* list, so a core tool stripped from this session's
     toolset (clarify in a subagent, kanban worker) otherwise gets told "call it directly"
@@ -247,7 +279,17 @@ def not_deferrable_error(name: str, session_tool_names: Optional[Iterable[str]] 
     instead. Stays None for callers with no session context; deliberately never consults the
     global blocklist, because a top-level session legitimately has these tools.
     """
-    from tools.tool_search import _core_tool_names  # late: tool_search imports this module
+    from tools.tool_search import _core_tool_names, is_deferrable_tool_name, load_config_readonly
+    real = _registered_spelling(name)
+    if real is not None:
+        if session_tool_names is not None and real not in set(session_tool_names):
+            return unavailable_in_session_reason(name)
+        if is_deferrable_tool_name(real, load_config_readonly().effective_defer_tools):
+            return (f"'{name}' is listed under that spelling, but tool_call takes the registered name "
+                    f"'{real}'. Working call: "
+                    + _call_text(f'tool_call(calls=[{{"name": "{real}", "arguments": {{ARGS}}}}])', arguments))
+        return (f"'{name}' is a directly-listed tool (registered as '{real}'), not a deferred one. "
+                "Call it directly, not through tool_call: " + _call_text(f"{name}({{ARGS}})", arguments))
     if name in _core_tool_names() or _registry_entry(name) is not None:
         if session_tool_names is not None and name not in set(session_tool_names):
             return unavailable_in_session_reason(name)

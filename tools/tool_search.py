@@ -24,8 +24,8 @@ from tools.tool_search_catalog import (
     CatalogEntry, _fn, _listing_group_label, _registry_entry, _registry_toolset,
     build_catalog, build_catalog_listing_with_form, search_catalog)
 from tools.tool_search_validation import (
-    local_batch_error, normalize_tool_call_entries, not_deferrable_error, session_unavailable_error,
-    unavailable_in_session_reason, validate_deferred_call_args)
+    _registered_spelling, local_batch_error, normalize_tool_call_entries, not_deferrable_error,
+    session_unavailable_error, unavailable_in_session_reason, validate_deferred_call_args)
 from tools.connectors import CONNECTOR_BATCH_SENTINEL, is_connector_name
 from tools.connectors.search import (
     connections_in_scope, connector_entries_by_group, connectors_unavailable, remote_schemas_for)
@@ -529,6 +529,10 @@ def dispatch_tool_describe(args: dict[str, Any], *, current_tool_defs: list[dict
             name, load_config_readonly().effective_defer_tools):
             # Registered but bridge/core/GUI-surface: a real name, wrong door.
             errors[name] = not_deferrable_error(name, session_names)
+        elif (real := _registered_spelling(name)) is not None:
+            # A wire spelling (mcp__<core tool>, a prose alias): name the registered one to describe.
+            errors[name] = (f"'{name}' is a spelling of the registered tool '{real}'. "
+                            f"Describe it as tool_describe(names=[\"{real}\"]) and call it by that name.")
         else:
             not_found.append(name)
     result: dict[str, Any] = {"tools": tools}
@@ -612,7 +616,7 @@ def resolve_underlying_call(args: dict[str, Any], session_tool_names: Optional[I
     if unavailable:
         return None, {}, unavailable
     if not is_deferrable_tool_name(name, load_config_readonly().effective_defer_tools):
-        return None, {}, not_deferrable_error(name, session_tool_names)
+        return None, {}, not_deferrable_error(name, session_tool_names, raw_args)
     return name, raw_args, None
 
 
