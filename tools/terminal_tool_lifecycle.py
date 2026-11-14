@@ -79,11 +79,11 @@ def _teardown_env(env: Any, task_id: str, *, force_remove: Optional[bool] = None
             logger.warning("Error cleaning up environment for task %s: %s", task_id, e)
 
 
-def _clear_file_ops_cache(task_id: str) -> None:
+def _clear_file_ops_cache(task_id: str, *, keep_write_baselines: bool = False) -> None:
     """Invalidate the file_ops cache entry so ShellFileOperations can't reference a dead sandbox."""
     try:
         from tools.file_tools import clear_file_ops_cache
-        clear_file_ops_cache(task_id)
+        clear_file_ops_cache(task_id, keep_write_baselines=keep_write_baselines)
     except ImportError:
         pass
 
@@ -167,7 +167,8 @@ def _cleanup_inactive_envs(lifetime_seconds: int = 300):
                 _creation_locks.pop(t, None)
     for task_id, env in envs_to_stop:
         if env is not None:
-            _clear_file_ops_cache(task_id)
+            # Idle, not finished: the task may come back and rewrite a file it wrote.
+            _clear_file_ops_cache(task_id, keep_write_baselines=True)
             if _is_workspace_key(task_id) and callable(getattr(env, "stop_idle", None)):
                 # Persistent per-workspace container: stop it (state kept, restarted on next use)
                 # instead of leaving it running forever like the one profile container.

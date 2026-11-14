@@ -374,8 +374,14 @@ def _get_file_ops(task_id: str = "default") -> ShellFileOperations:
     return file_ops
 
 
-def clear_file_ops_cache(task_id: str | None = None):
-    """Clear file-operation state for a finished task, or all tasks."""
+def clear_file_ops_cache(task_id: str | None = None, *, keep_write_baselines: bool = False):
+    """Clear file-operation state for a finished task, or all tasks.
+
+    ``keep_write_baselines`` (the terminal idle reaper): drop everything bound to the env but
+    keep the task's whole-file baselines. They name host files, not the env, and each one is
+    re-checked against the file's stat and sha256 before a write may rely on it, so a task that
+    idled past ``lifetime_seconds`` can still rewrite a file it wrote or read in full.
+    """
     with _file_ops_lock:
         if task_id:
             _file_ops_cache.pop(task_id, None)
@@ -384,7 +390,10 @@ def clear_file_ops_cache(task_id: str | None = None):
 
     with _read_tracker_lock:
         if task_id:
-            _read_tracker.pop(task_id, None)
+            dropped = _read_tracker.pop(task_id, None)
+            baselines = (dropped or {}).get("full_write_baselines") if keep_write_baselines else None
+            if baselines:
+                _task_data(task_id)["full_write_baselines"].update(baselines)
         else:
             _read_tracker.clear()
 
