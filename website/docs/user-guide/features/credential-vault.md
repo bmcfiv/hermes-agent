@@ -112,6 +112,16 @@ Headless sessions (cron, webhooks, the API server) cannot confirm and are
 refused, so a prompt injection that reaches a checkout page can ask, but it
 cannot spend. Address fills need no confirmation.
 
+Cards kept in 1Password can be used instead of copying them into the local
+vault: set `vault.onepassword.include_cards: true` (off by default). Credit Card
+items then appear beside your logins as `payment` handles, labelled with the
+card's title and the last four digits 1Password shows, never the number. A card
+fills only on the websites saved on the 1Password item, exactly like a local
+card bound to a site, so add the shop's checkout address to the card in
+1Password first; a card with no website is listed as unavailable. The number,
+CVC, expiry and cardholder name are read from 1Password only after you confirm
+the fill.
+
 ## Managing what's saved
 
 - **Desktop → Settings → Passwords & Logins**: everything saved, the detected
@@ -187,6 +197,7 @@ vault:
   onepassword:
     enabled: false          # opt OUT of a detected manager (default: on when installed)
     account: ""             # `op --account` shorthand; empty = default
+    include_cards: false    # also offer Credit Card items as payment handles
     service_account_token_env: OP_SERVICE_ACCOUNT_TOKEN
   bitwarden:
     enabled: false

@@ -1,4 +1,4 @@
-"""1Password Login items as a vault backend (``op`` CLI).
+"""1Password Login items (and, opt-in, Credit Card items) as a vault backend (``op`` CLI).
 
 Unlock: ``op signin --raw`` with the master password on stdin (desktop-app
 integration or account-level auth) mints an ``OP_SESSION_<account>`` token.
@@ -6,6 +6,11 @@ A configured service-account token skips the prompt entirely (headless).
 List: ``op item list --categories Login --format json`` → title, urls,
 username, vault. Resolve: ``op item get <id> --vault <vault-id> ...`` (service
 accounts reject an item read without a vault query).
+
+With ``vault.onepassword.include_cards: true`` the same listing also asks for
+Credit Card items; each becomes a ``payment`` handle bound to the websites saved
+on the card, and its fields are read only at fill time (after the tool's origin
+guard and the user's payment confirmation).
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -26,6 +32,9 @@ from agent.vault_store import VaultItemMeta, normalize_origin
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 30.0
+_CARD_CATEGORY = "CREDIT_CARD"  # `op item list/get` JSON category of a Credit Card item
+# Credit Card field ids (`op item get --format json`) → the payment payload agent/vault_store.py defines.
+_CARD_FIELDS = {"ccnum": "card_number", "cvv": "cvc", "cardholder": "cardholder_name"}
 
 
 class OnePasswordLoginBackend(LoginBackend):
@@ -40,6 +49,8 @@ class OnePasswordLoginBackend(LoginBackend):
         env_name = str(self.cfg.get("service_account_token_env") or "OP_SERVICE_ACCOUNT_TOKEN")
         self._service_token = get_secret(env_name, "") or ""
         self._item_vaults: dict[str, str] = {}  # item id -> vault id from the latest ``item list``
+        self._item_kinds: dict[str, str] = {}   # item id -> "login" | "payment" from the same listing
+        self._cards = self.cfg.get("include_cards") is True  # opt-in: stock lists Login items only
 
     # ── auth ────────────────────────────────────────────────────────────────
 
@@ -105,15 +116,21 @@ class OnePasswordLoginBackend(LoginBackend):
     def list_items(self) -> list[VaultItemMeta]:
         if not self.is_unlocked():
             return []
-        raw = json.loads(self._run("item", "list", "--categories", "Login", "--format", "json") or "[]")
+        categories = "Login,Credit Card" if self._cards else "Login"
+        raw = json.loads(self._run("item", "list", "--categories", categories, "--format", "json") or "[]")
         out: list[VaultItemMeta] = []
-        self._item_vaults = {}
+        self._item_vaults, self._item_kinds = {}, {}
         for item in raw if isinstance(raw, list) else []:
             vault = item.get("vault") or {}
+            is_card = self._cards and item.get("category") == _CARD_CATEGORY
             if item.get("id"):
                 self._item_vaults[str(item["id"])] = str(vault.get("id") or "") if isinstance(vault, dict) else ""
+                self._item_kinds[str(item["id"])] = "payment" if is_card else "login"
             urls = [str(u["href"]) for u in item.get("urls") or [] if isinstance(u, dict) and u.get("href")]
             origins = _all_origins(urls)
+            if is_card:
+                out.append(_card_meta(self.prefix, item, origins))
+                continue
             if not origins:
                 continue
             username = str(item.get("additional_information") or "").strip() or None
@@ -127,15 +144,17 @@ class OnePasswordLoginBackend(LoginBackend):
     def get_meta(self, handle: str) -> Optional[VaultItemMeta]:
         return next((m for m in self.list_items() if m.id == handle), None)
 
-    def _item_selector(self, handle: str) -> list[str]:
-        """``op item get`` target for a listed login. A service account must name the item's vault
-        (``--vault``) and ``item list`` reports it, so the vault comes from the same listing that
-        proved the handle is a Login item; a handle nothing listed is refused before any secret read."""
+    def _item_selector(self, handle: str, kind: str = "login") -> list[str]:
+        """``op item get`` target for a listed item of ``kind``. A service account must name the item's
+        vault (``--vault``) and ``item list`` reports it, so the vault comes from the same listing that
+        proved the handle is that kind of item; a handle nothing listed as ``kind`` is refused before
+        any secret read (a card handle never yields a password, a login handle never yields card fields)."""
         item_id = handle[len(self.prefix):]
-        if item_id not in self._item_vaults:
+        if self._item_kinds.get(item_id) != kind:
             self.list_items()
-        if item_id not in self._item_vaults:
-            raise RuntimeError("1Password login not found; list logins again")
+        if self._item_kinds.get(item_id) != kind:
+            what = "card" if kind == "payment" else "login"
+            raise RuntimeError(f"1Password {what} not found; list {what}s again")
         vault_id = self._item_vaults[item_id]
         return [item_id, "--vault", vault_id] if vault_id else [item_id]
 
@@ -150,6 +169,50 @@ class OnePasswordLoginBackend(LoginBackend):
         except Exception:
             return None
         return code if code.isdigit() else None
+
+    def resolve_secret(self, handle: str) -> dict[str, str]:
+        """Card payload for a listed Credit Card handle, in the field names ``PAYMENT_FIELDS`` uses.
+        Raises without any value in the message; anything that is not a listed card is refused."""
+        selector = self._item_selector(handle, kind="payment")
+        try:
+            item = json.loads(self._run("item", "get", *selector, "--format", "json", "--reveal"))
+        except ValueError:
+            raise RuntimeError("1Password returned an unreadable card item") from None
+        if not isinstance(item, dict) or item.get("category") != _CARD_CATEGORY:
+            raise RuntimeError("1Password item is not a Credit Card")
+        return _card_payload(item)
+
+
+def _card_meta(prefix: str, item: dict, origins: list[str]) -> VaultItemMeta:
+    """Metadata for a Credit Card item: title plus the last four digits 1Password shows in its list
+    subtitle, never more. A card with no saved website lists with no origin, so the tool reports it
+    unavailable and refuses to fill it (the origin guard is the same as for every payment item)."""
+    title = str(item.get("title") or "Credit card")
+    last4 = re.fullmatch(r"\D*(\d{4})\D*", str(item.get("additional_information") or ""))
+    return VaultItemMeta(
+        id=f"{prefix}{item.get('id')}", kind="payment", label=f"{title} ending {last4.group(1)}" if last4 else title,
+        origin=origins[0] if origins else None, created_at=str(item.get("created_at") or ""),
+        allowed_origins=_web_origins(origins) if origins else ())
+
+
+def _card_payload(item: dict) -> dict[str, str]:
+    """Map a Credit Card item's fields (``ccnum``, ``cvv``, ``expiry`` as ``YYYYMM``, ``cardholder``)
+    onto the payment payload. Missing required fields are named, never their values."""
+    fields = {str(f.get("id") or ""): str(f.get("value") or "").strip()
+              for f in item.get("fields") or [] if isinstance(f, dict)}
+    out = {name: fields[fid] for fid, name in _CARD_FIELDS.items() if fields.get(fid)}
+    if "card_number" in out:
+        out["card_number"] = re.sub(r"[\s-]", "", out["card_number"])
+    expiry = fields.get("expiry", "")
+    if m := re.fullmatch(r"(\d{4})(\d{2})", expiry):  # op's MONTH_YEAR value
+        out["exp_year"], out["exp_month"] = m.group(1), m.group(2)
+    elif m := re.fullmatch(r"(\d{1,2})\s*/\s*(\d{2}|\d{4})", expiry):  # as typed: MM/YY or MM/YYYY
+        out["exp_month"], out["exp_year"] = m.group(1).zfill(2), m.group(2) if len(m.group(2)) == 4 else "20" + m.group(2)
+    missing = [label for key, label in (("card_number", "number"), ("exp_month", "expiry date"),
+                                        ("cvc", "verification number")) if key not in out]
+    if missing:
+        raise RuntimeError(f"1Password card is missing its {', '.join(missing)}")
+    return out
 
 
 def _web_origins(origins: list[str]) -> tuple:

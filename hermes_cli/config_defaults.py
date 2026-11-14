@@ -2427,16 +2427,16 @@ DEFAULT_CONFIG = {
     },
     # External secret sources — pull credentials from secret managers at startup instead of storing
     # them in ~/.hermes/.env.
-    # Browser credential vault: which login sources browser_vault may draw from. The local
-    # encrypted vault (`hermes vault add`, Desktop → Settings → Credential Vault) is always on.
-    # External password managers are unlocked per session with a masked master-password prompt;
-    # headless sessions (cron, webhook, API) never prompt and see them as locked.
+    # Browser credential vault: which login sources browser_vault may draw from. The local encrypted vault
+    # (`hermes vault add`, Desktop → Settings → Credential Vault) is always on. External password managers unlock
+    # per session with a masked master-password prompt; headless sessions (cron, webhook, API) see them as locked.
     "vault": {
         "key_storage": "file",  # NEW vault's key: file (0600 vault.key) | keychain (OS; file if none). See `hermes vault key`.
         "onepassword": {  # detected managers are login sources unless the user opts out (enabled: false)
             "enabled": True,        # `op` CLI: Login items with a website URL become fillable handles.
             "account": "",          # account shorthand for `op --account`; empty = default account.
             "binary_path": "",      # absolute path to op; empty = PATH.
+            "include_cards": False,  # also list Credit Card items (with a saved website) as payment handles.
             # Env var holding a service-account token (headless auth, no unlock prompt). Unset = prompt.
             "service_account_token_env": "OP_SERVICE_ACCOUNT_TOKEN",
         },

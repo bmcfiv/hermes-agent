@@ -60,8 +60,8 @@ class LoginBackend(ABC):
         return None
 
     def resolve_secret(self, handle: str) -> dict[str, str]:
-        """Full payload of a payment/address item (server-side only). External managers list only
-        logins, so the base returns the password-only shape."""
+        """Full payload of a payment/address item (server-side only). A manager that lists only
+        logins keeps the base password-only shape; 1Password overrides it for opt-in card items."""
         return {"password": self.resolve_password(handle)}
 
 
