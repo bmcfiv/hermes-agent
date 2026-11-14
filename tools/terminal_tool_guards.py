@@ -311,7 +311,12 @@ def gateway_lifecycle_block(
     unsafe, refusal = scan_gateway_lifecycle(
         command,
         cwd=guard_cwd,
-        read_remote_script=lambda p: _read_script_for_guard(env, guard_cwd, p, _MAX_REFERENCED_SCRIPT_BYTES),
+        # A local backend shares the host filesystem the walk already read, so a path missing there
+        # is missing in the shell too: no `head -c` subprocess per miss, and a Python body full of
+        # `a/b` expressions can no longer exhaust the remote-read budget.
+        read_remote_script=None if env_type == "local" else (
+            lambda p: _read_script_for_guard(env, guard_cwd, p, _MAX_REFERENCED_SCRIPT_BYTES)
+        ),
     )
     if unsafe and refusal:
         # Not a lifecycle command: a script the command EXECUTES could not be scanned (budget,

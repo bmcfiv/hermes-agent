@@ -348,6 +348,18 @@ _STRING_COMMAND_OPTIONS = {
 _TRANSPARENT_PREFIX_OPERANDS = {"timeout": 1}
 
 _ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# A redirection operator with an optional fd number; ``target`` is empty when the target is the next
+# token (``> out``). ``&`` is a tokenizer punctuation char, so ``2>&1`` arrives as ``2>`` ``&`` ``1``.
+_LEADING_REDIRECTION = re.compile(r"^\d*(?:<<<|<<-?|>>|>\||<>|>|<)(?P<target>.*)$", re.DOTALL)
+# Data formats a path in command position may name without being a script (see _is_data_path).
+_DATA_FILE_SUFFIXES = frozenset({
+    ".parquet", ".feather", ".arrow", ".geojson", ".gpkg", ".shp", ".dbf", ".shx", ".sqlite",
+    ".sqlite3", ".db", ".json", ".jsonl", ".ndjson", ".csv", ".tsv", ".xlsx", ".xls", ".pkl",
+    ".pickle", ".npy", ".npz", ".h5", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff",
+    ".pdf", ".html", ".htm", ".xml", ".svg", ".kml", ".kmz", ".log", ".duckdb", ".mbtiles", ".gz",
+    ".zip", ".zst", ".xz", ".bz2",
+})
+_DATA_DEVICES = frozenset({"/dev/null", "/dev/zero", "/dev/random", "/dev/urandom"})
 
 # Bound the walk: a pathological token run must not spin here.
 _MAX_PREFIX_PEELS = 8
@@ -688,8 +700,21 @@ def _peel_transparent_prefixes(segment: list[str], index: int) -> int:
 
 
 def _command_token_index(segment: list[str]) -> Optional[int]:
-    """Return the executable token index after simple env assignments."""
-    return next((i for i, token in enumerate(segment) if not _ENV_ASSIGNMENT.match(token)), None)
+    """Return the executable token index after simple env assignments and leading redirections.
+
+    A shell runs ``>/dev/null 2>err.log /x/run.sh`` as ``/x/run.sh``: a redirection (and its detached
+    target) is never the command, so it must neither hide the real script nor be read as one."""
+    index = 0
+    while index < len(segment):
+        token = segment[index]
+        redirection = _LEADING_REDIRECTION.match(token)
+        if redirection:
+            index += 1 if redirection.group("target") else 2
+            continue
+        if not _ENV_ASSIGNMENT.match(token):
+            return index
+        index += 1
+    return None
 
 
 def _executed_command_index(segment: list[str]) -> Optional[int]:
@@ -879,8 +904,9 @@ def _iter_option_values(segment: list[str], start: int, option: str) -> Iterator
             yield token[len(prefix):]
 
 
-def _references_at(segment: list[str], index: int, cwd: Optional[str]) -> Iterator[Path]:
-    """Yield the scripts the token at *index* executes, if any."""
+def _references_at(segment: list[str], index: int, cwd: Optional[str]) -> Iterator[tuple[Path, bool]]:
+    """Yield ``(path, names_data)`` for the scripts the token at *index* executes, if any.
+    ``names_data`` is True only for a data-named path run by name (see ``_is_data_path``)."""
     if index >= len(segment):
         return
     executable = segment[index]
@@ -888,7 +914,7 @@ def _references_at(segment: list[str], index: int, cwd: Optional[str]) -> Iterat
 
     if executable_name in {".", "source"}:
         if len(segment) > index + 1:
-            yield from _resolved_or_nothing(segment[index + 1], cwd)
+            yield from ((path, False) for path in _resolved_or_nothing(segment[index + 1], cwd))
         return
 
     if executable_name in _SHELL_EXECUTABLES:
@@ -909,16 +935,28 @@ def _references_at(segment: list[str], index: int, cwd: Optional[str]) -> Iterat
                 continue
             break
         if arg_index < len(arguments) and arguments[arg_index] not in _SHELL_COMMAND_FLAGS:
-            yield from _resolved_or_nothing(arguments[arg_index], cwd)
+            yield from ((path, False) for path in _resolved_or_nothing(arguments[arg_index], cwd))
         return
 
     # A bare "/" is pathlib's division operator in Python sources, not an executable; resolving it
     # hits the filesystem root and fails the regular-file check, hard-blocking innocent .py scripts.
     if executable.strip("/") and ("/" in executable or executable.endswith((".sh", ".bash", ".zsh"))):
-        yield from _resolved_or_nothing(executable, cwd)
+        yield from ((path, _is_data_path(path)) for path in _resolved_or_nothing(executable, cwd))
 
 
-def _iter_referenced_shell_scripts(command: str, *, cwd: Optional[str] = None) -> Iterator[Path]:
+def _is_data_path(path: Path) -> bool:
+    """A path in command position that names data, not a script: a data-format suffix or a
+    standard data device. A ``(`` in a Python body turns ``pd.read_parquet('x/cells.parquet')``
+    into one, and ``diff <(ls) /dev/null`` leaves ``/dev/null`` in command position. Such a path is
+    still READ and scanned when it is readable text under the cap; it only loses the fail-closed
+    verdicts (oversized, binary, device, live SQLite, cloud placeholder), exactly like a path that
+    is merely mentioned. Lexical on purpose: an executable bit is never trusted (``chmod +x s.sh
+    && ./s.sh`` runs a file that was not executable when the guard looked), and ``bash F`` /
+    ``source F`` keep the full fail-closed scan of F whatever its name."""
+    return path.suffix.lower() in _DATA_FILE_SUFFIXES or str(path) in _DATA_DEVICES
+
+
+def _iter_referenced_shell_scripts(command: str, *, cwd: Optional[str] = None) -> Iterator[tuple[Path, bool]]:
     """Yield scripts executed directly or through a POSIX shell. Each segment is read at the
     original token AND at the peeled wrapper target — additive on purpose: peeling must never REMOVE
     a reference (a local ``./timeout`` is a script, not the coreutils wrapper)."""
@@ -1126,9 +1164,13 @@ def _contains_unsafe_gateway_action(
     # `/x/restart.sh` to os.system() executes it. Only the fail-closed verdicts (cloud placeholder,
     # oversized/binary, budget) stay restricted to the executed view — a mere data mention must not
     # trip them. Executed candidates come first so a mention never starves a real script's budget.
-    candidates = [(path, executed) for path in _iter_referenced_shell_scripts(walk_command, cwd=cwd)]
+    executed_view = list(_iter_referenced_shell_scripts(walk_command, cwd=cwd))
+    # Data-named paths run by name are scanned as mentions, after every real script, so a large
+    # data file can neither fail the walk closed nor spend the budget a real script needs.
+    candidates = [(path, executed) for path, names_data in executed_view if not names_data]
+    candidates += [(path, False) for path, names_data in executed_view if names_data]
     if walk_command != command:
-        candidates += [(path, False) for path in _iter_referenced_shell_scripts(command, cwd=cwd)]
+        candidates += [(path, False) for path, _ in _iter_referenced_shell_scripts(command, cwd=cwd)]
 
     for script_path, candidate_executed in candidates:
         # Do not touch a FileProvider path even to discover whether the file is hydrated.
@@ -1154,6 +1196,9 @@ def _contains_unsafe_gateway_action(
         if unsafe:
             if candidate_executed:
                 return _refuse_unreadable(budget, script_path, _unreadable_reason(script_path))
+            # An unscannable mention stays unvisited: a later `bash P` elsewhere in the walk must
+            # still meet the fail-closed verdict instead of skipping P as already seen.
+            visited.discard(resolved)
             continue
         if script_text is None and read_remote_script is not None:
             # Local path missing; the remote backend's output crosses the same trust boundary as a
