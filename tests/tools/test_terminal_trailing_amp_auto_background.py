@@ -55,7 +55,8 @@ def test_trailing_amp_runs_as_tracked_background_through_the_same_guards(tmp_pat
 @pytest.mark.parametrize("command, expected", [
     ("python3 -m http.server 8765 & curl -s localhost:8765", "'&' backgrounding"),
     ("sleep 1 & sleep 2 &", "'&' backgrounding"),
-    ("nohup ./worker.sh > /dev/null 2>&1 &", "nohup/disown/setsid"),
+    # A lone `nohup job &` is converted now (test_terminal_wrapped_background); setsid is not.
+    ("setsid ./worker.sh > /dev/null 2>&1 &", "nohup/disown/setsid"),
     ("python3 -m http.server 8765", "long-lived server"),
     # Approval keys on the `&` here (gateway outside its service manager): no conversion.
     ("hermes gateway run &", "'&' backgrounding"),

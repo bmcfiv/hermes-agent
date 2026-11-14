@@ -17,7 +17,7 @@ import stat
 from pathlib import Path
 from typing import Any, Optional
 
-from tools.shell_heredoc import strip_inert_heredoc_bodies
+from tools.shell_heredoc import iter_heredoc_bodies, strip_inert_heredoc_bodies
 
 logger = logging.getLogger("tools.terminal_tool")
 
@@ -216,6 +216,80 @@ def trailing_amp_background_command(command: str) -> str | None:
     if _approval_identity(command) != _approval_identity(stripped):
         return None
     return stripped
+
+
+# `nohup` at the head of an and-or element, and a `& disown` tail: wrappers whose only job is to
+# outlive the shell. A tracked background process outlives the call by itself.
+_NOHUP_ELEMENT_RE = re.compile(r"(^\s*|&&\s*|\|\|\s*)nohup\s+(?=\S)")
+_DISOWN_TAIL_RE = re.compile(r"&\s*disown(?:\s+-[ah]+)?\s*$")
+# Lines allowed AFTER the backgrounded line: they only report (`echo started $!`, `sleep 2`), so
+# running them after the job instead of beside it changes nothing they compute.
+_REPORT_ONLY_LINE_RE = re.compile(r"^\s*(?:echo|printf|true|:|sleep\s+\d+(?:\.\d+)?\s*$)(?:\s|$)")
+# Compound commands and groups: a job inside one may run zero or many times, or in a subshell.
+_COMPOUND_RE = re.compile(
+    r"(?:^|[;&|\s])(?:for|while|until|if|then|else|elif|fi|case|esac|select|do|done|function)(?=[\s;]|$)|[(){}]"
+)
+
+
+def _backgrounds(masked_line: str) -> bool:
+    return "&" in _NON_BACKGROUND_AMP_RE.sub("", masked_line) or bool(_SHELL_LEVEL_BACKGROUND_RE.search(masked_line))
+
+
+def _unwrap_line(line: str, masked_line: str) -> str | None:
+    """*line* minus its `nohup` element heads and `& disown` tail, or None when the same edit on
+    the quote-masked line does not agree (the words sat inside a quoted string)."""
+    edited, edits = _NOHUP_ELEMENT_RE.subn(r"\1", line)
+    edited_masked, masked_edits = _NOHUP_ELEMENT_RE.subn(r"\1", masked_line)
+    edited, tail = _DISOWN_TAIL_RE.subn("&", edited)
+    edited_masked, masked_tail = _DISOWN_TAIL_RE.subn("&", edited_masked)
+    if (edits, tail) != (masked_edits, masked_tail) or _strip_quotes(edited) != edited_masked:
+        return None
+    return edited
+
+
+def wrapped_background_command(command: str) -> str | None:
+    """The command with its ONE backgrounded job unwrapped, when that job is the shape a model
+    writes for "start this and let it run": setup lines, then one top-level line `[nohup] job &`
+    (or `job & disown`), then at most report-only lines (`echo started`, `sleep 2`).
+
+    The whole program then runs as one tracked background process: the setup runs first, the job
+    in the foreground of that process, the report lines after it. Anything less certain keeps the
+    refusal: two or more background jobs, a job inside a loop/conditional/group, a heredoc body
+    the shell reads, a line continuation, any executable substitution, quotes spanning lines,
+    real commands after the job (a readiness check that expects the job to be running), setsid,
+    or a change in approval identity.
+    """
+    if not isinstance(command, str) or "\n" not in command.strip() and "nohup" not in command and "disown" not in command:
+        return None
+    if _looks_like_help_or_version_command(command) or any(m in command for m in _EXECUTABLE_SUBSTITUTION_MARKERS):
+        return None
+    masked = _strip_quotes(command)
+    if masked.count("\n") != command.count("\n"):
+        return None
+    shell_view = strip_inert_heredoc_bodies(command)
+    if any(body.strip() and body in shell_view for _unit, body in iter_heredoc_bodies(command)):
+        return None
+    lines, masked_lines = command.split("\n"), masked.split("\n")
+    if any(m.rstrip().endswith("\\") or _COMPOUND_RE.search(m) for m in masked_lines):
+        return None
+    jobs = [i for i, m in enumerate(masked_lines) if _backgrounds(m)]
+    if len(jobs) != 1 or re.search(r"\bsetsid\b", masked_lines[jobs[0]]):
+        return None
+    index = jobs[0]
+    if not all((_REPORT_ONLY_LINE_RE.match(m) and not re.search(r"[;|&]", m)) or not m.strip()
+               for m in masked_lines[index + 1:]):
+        return None
+    unwrapped = _unwrap_line(lines[index], masked_lines[index])
+    job = trailing_amp_background_command(unwrapped) if unwrapped is not None else None
+    if job is None:
+        return None
+    converted = "\n".join([*lines[:index], job, *lines[index + 1:]])
+    return converted if _approval_identity(command) == _approval_identity(converted) else None
+
+
+def auto_background_command(command: str) -> str | None:
+    """What a foreground call runs as background=true instead of being refused, else None."""
+    return trailing_amp_background_command(command) or wrapped_background_command(command)
 
 
 def _read_script_for_guard(env: Any, guard_cwd: str, script_path: str, max_bytes: int) -> Optional[str]:

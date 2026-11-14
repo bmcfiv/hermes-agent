@@ -952,6 +952,7 @@ def _command_requires_pipe_stdin(command: str) -> bool:
 from tools.terminal_tool_guards import (
     _foreground_background_guidance, _safe_command_preview, _validate_workdir,
     gateway_lifecycle_block, locked_skill_block, self_repo_block, trailing_amp_background_command,
+    auto_background_command,
 )
 from tools.terminal_tool_background import _YIELDED_NOTE, spawn_background_process, yield_to_background_handler
 from tools.terminal_tool_result import finalize_foreground_result
@@ -1244,13 +1245,14 @@ def _plan_execution(
         # An over-cap foreground timeout is a bounded job the caller wants to wait for (test suites,
         # builds). Refusing it only bought a mechanical retry: 454 refusals in one run, every one
         # re-sent lower/split/background. Promote to a tracked background process instead; the
-        # caller is told in the result. The `&`/nohup/server guidance below stays a refusal: those
-        # need the command itself rewritten, which the tool cannot do safely.
+        # caller is told in the result. Server guidance and ambiguous `&`/nohup shapes stay a
+        # refusal: those need the command itself rewritten, which the tool cannot do safely.
         # The detachment guidance applies whether or not the call is promoted: a promoted `cmd &`
         # would start a tracked shell that exits at once while its payload runs untracked.
-        # Exception: a lone TRAILING `&` is unambiguous (the caller asked for exactly what
+        # Exception: a lone TRAILING `&`, or one top-level `[nohup] job &` after setup lines and
+        # before report-only lines, is unambiguous (the caller asked for exactly what
         # background=true does), so run it that way instead of spending a model turn on a resend.
-        auto_bg = trailing_amp_background_command(command)
+        auto_bg = auto_background_command(command)
         if auto_bg is None:
             guidance = _foreground_background_guidance(command)
             if guidance:
