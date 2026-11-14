@@ -156,6 +156,7 @@ Tools for driving desktop [Projects](../user-guide/cli.md) — named, multi-fold
 
 | Tool | Description | Requires environment |
 |------|-------------|----------------------|
+| `start_session` | Open a NEW separate chat session and start its first turn with `prompt` (own transcript and title, listed and resumable; it waits for the user if it needs an answer). Opt-in: `session_spawn.enabled`. | — |
 | `desktop_project` | One action enum for the three Project verbs: `create` makes a desktop Project (a named workspace) and switches this chat into it — pass `path` to anchor it to a repo/folder; `list` shows the desktop Projects and which one is active; `switch` moves this chat into an existing Project (by name, slug, or id), moving the session workspace to the project's primary folder. | — |
 
 ## `memory` toolset

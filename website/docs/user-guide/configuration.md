@@ -1005,6 +1005,23 @@ The MCP threshold is always capped at the (possibly context-scaled) generic per-
 
 Hermes also flags **provider-side elision**: when an MCP or web tool result embeds its own truncation markers (`...N more items`, `"has_more": true`, "saved to sandbox" notes), a one-line notice is appended to the result warning that the visible data is incomplete and should be paged/fetched before treating any enumeration as complete.
 
+## Spawning sessions
+
+The `start_session` tool lets the agent open a new, separate chat session (its own transcript and
+title, listed and resumable like any chat) and run its first turn. Unlike `delegate_task`, the child is
+a real `hermes chat` process and its result is not returned to the caller. It is off by default:
+
+```yaml
+session_spawn:
+  enabled: false     # true = expose the start_session tool
+  max_depth: 1       # a spawned session may not spawn when depth >= max_depth
+  max_per_hour: 6    # cap per parent session
+  allow_cron: false  # true = cron runs may spawn
+```
+
+A session title that already exists is refused, never resumed. A leading `Model: X` / `Title: Y` line
+in the prompt is honoured; `X` is a `model.aliases` entry, a `provider/model` id, or the default family.
+
 ## Global Toolset Disable
 
 To suppress specific toolsets across the CLI and every gateway platform in one

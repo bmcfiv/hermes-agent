@@ -31,6 +31,7 @@ _HERMES_CORE_TOOLS = [
     "kanban_unblock",
     "kanban_attach", "kanban_attach_url", "kanban_attachments",
     "computer_use",
+    "start_session",  # opt-in: withdrawn by its check_fn unless `session_spawn.enabled`
     # Service-gated connector account status and authorization links.
     "manage_connections",
 ]
@@ -149,7 +150,7 @@ TOOLSETS = {
     ),
     "clarify": _ts("Ask the user clarifying questions (multiple-choice or open-ended)", ["clarify"]),
     "code_execution": _ts("Run Python scripts that call tools programmatically (reduces LLM round trips)", ["execute_code"]),
-    "delegation": _ts("Spawn subagents with isolated context for complex subtasks", ["delegate_task"]),
+    "delegation": _ts("Spawn subagents with isolated context for complex subtasks", ["delegate_task", "start_session"]),
     "kanban": _ts(
         "Kanban multi-agent coordination — only active when the agent is spawned by "
         "the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs "

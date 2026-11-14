@@ -59,7 +59,7 @@ Or in-session:
 | `coding` | composite (`file` + `terminal` + `search` + `web` + `skills` + `browser` + `todo` + `memory` + `session_search` + `clarify` + `code_execution` + `delegation` + `vision`) | Coding-focused bundle for software work: file editing, terminal, search, web docs, skills, browser, delegate, and code execution. |
 | `cronjob` | `cronjob_manage` | Schedule and manage recurring tasks. |
 | `debugging` | composite (`file` + `terminal` + `web`) | Debug bundle — file, process/terminal, web extract/search. |
-| `delegation` | `delegate_task` | Spawn isolated subagent instances for parallel work. |
+| `delegation` | `delegate_task`, `start_session` | Spawn isolated subagent instances for parallel work; `start_session` opens a new separate, resumable chat session (opt-in: `session_spawn.enabled`, see [Spawning sessions](../user-guide/configuration.md#spawning-sessions)). |
 | `discord` | `discord` | Core Discord text/embed/DM actions (gateway-only). Active on the `hermes-discord` toolset. |
 | `discord_admin` | `discord_admin` | Discord moderation (bans, role changes, channel management). Active on the `hermes-discord` toolset; requires the bot to hold the relevant Discord permissions. |
 | `feishu_doc` | `feishu_doc_read` | Read Feishu/Lark document content. Used by the Feishu document-comment intelligent-reply handler. |
